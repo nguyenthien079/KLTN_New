@@ -977,7 +977,44 @@ Entity Distribution:
 - Node.js 18+
 - PostgreSQL 14+
 
-### Backend Setup
+### 1. Database Setup
+
+#### Create Database & User
+
+```bash
+# Connect to PostgreSQL
+psql -U postgres
+
+# Create database and user
+CREATE DATABASE medical_ner;
+CREATE USER medical_user WITH PASSWORD 'medical_pass_2024';
+GRANT ALL PRIVILEGES ON DATABASE medical_ner TO medical_user;
+\q
+```
+
+#### Import Sample Data (Recommended)
+
+We provide a **full database dump** with 1,240 articles and 28,653 sentences:
+
+```bash
+cd medical-ner/backend/data/sql
+
+# Set password
+export PGPASSWORD='medical_pass_2024'  # Linux/Mac
+# OR
+$env:PGPASSWORD='medical_pass_2024'    # Windows PowerShell
+
+# Import data (~3-5 minutes for 570 MB)
+psql -U medical_user -h localhost -d medical_ner -f medical_ner_data.sql
+
+# Verify
+psql -U medical_user -h localhost -d medical_ner -c "SELECT COUNT(*) FROM articles;"
+# Should return: 1240
+```
+
+📖 **Detailed import guide**: See `backend/data/sql/README.md`
+
+### 2. Backend Setup
 
 ```bash
 cd backend
@@ -993,8 +1030,11 @@ pip install -r requirements.txt
 cp ../.env.example .env
 # Edit .env: set DATABASE_URL, SECRET_KEY
 
-# Run migrations
+# Run migrations (create tables)
 alembic upgrade head
+
+# Import data (if not done above)
+# See: data/sql/README.md
 
 # Download PhoBERT model (optional)
 # Place in: models/phobert-medical/final_model/
@@ -1003,7 +1043,7 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend Setup
+### 3. Frontend Setup
 
 ```bash
 cd frontend
@@ -1015,7 +1055,7 @@ npm install
 npm run dev  # Port 5173
 ```
 
-### Docker Setup
+### 4. Docker Setup (Alternative)
 
 ```bash
 # From project root
@@ -1025,7 +1065,27 @@ docker-compose up -d
 # - backend: localhost:8000
 # - frontend: localhost:3000
 # - postgres: localhost:5432
+
+# Import data into Docker postgres
+docker exec -i medical-ner-postgres psql -U medical_user -d medical_ner < backend/data/sql/medical_ner_data.sql
 ```
+
+---
+
+## 📊 Database Statistics
+
+After importing the provided dump:
+
+| Table | Rows | Description |
+|-------|------|-------------|
+| `articles` | 1,240 | Crawled medical articles |
+| `sentences` | 28,653 | Processed sentences |
+| `entities` | 0 | Entity annotations (generated on-demand) |
+| `corrections` | 5 | Human-annotated samples |
+
+**Data sources**: vinmec.com, suckhoedoisong.vn, hellobacsi.com
+
+**Storage size**: ~1.5 GB with indexes
 
 ---
 
