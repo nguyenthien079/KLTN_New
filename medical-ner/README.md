@@ -546,6 +546,430 @@ Return summary statistics
 
 ---
 
+## 📊 Data Pipeline - Complete Workflow
+
+### Overview: Từ Crawl → Training → Production
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    STEP 1: CRAWL DATA                       │
+│          Crawl medical articles from websites               │
+└────────────────────────┬────────────────────────────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                STEP 2: PROCESS & FILTER                     │
+│         Segment, normalize, filter quality                  │
+└────────────────────────┬────────────────────────────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              STEP 3: PREPARE TRAINING DATA                  │
+│    Auto-label using Dictionary + Rule-based extractors     │
+└────────────────────────┬────────────────────────────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 STEP 4: TRAIN PHOBERT                       │
+│           Fine-tune PhoBERT on labeled data                 │
+└────────────────────────┬────────────────────────────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                STEP 5: EVALUATE & EXPORT                    │
+│              Test model and export to production            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### STEP 1: Crawl Medical Articles
+
+#### 1.1 Single URL Crawl (Quick Test)
+
+```bash
+cd backend
+
+# Crawl single article
+python test_crawl.py
+
+# Or use API
+curl -X POST http://localhost:8000/api/crawl/url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.vinmec.com/vie/benh/viem-phoi-1234"}'
+```
+
+#### 1.2 Batch Crawl (Production)
+
+**Script**: `scripts/crawl_batch.py`
+
+```bash
+# Crawl from 5 medical websites
+python scripts/crawl_batch.py
+
+# Sites included:
+# - Sức Khỏe Đời Sống: ~300 pages
+# - Vinmec: ~300 pages
+# - Hello Bacsi: ~200 pages
+# - Bệnh Viện Tâm Anh: ~200 pages
+# - Nhà Thuốc Long Châu: ~250 pages
+# Total: ~1250 pages
+```
+
+**Configuration** (`crawl_batch.py`):
+```python
+SITES = [
+    {
+        "name": "Sức Khỏe Đời Sống",
+        "urls": [
+            "https://suckhoedoisong.vn/benh",
+            "https://suckhoedoisong.vn/thuoc",
+            "https://suckhoedoisong.vn/trieu-chung"
+        ],
+        "max_pages": 300
+    },
+    # ... more sites
+]
+```
+
+**Output**:
+- Articles saved to `articles` table
+- Metadata: title, url, content, source, crawled_at
+- Auto-deduplication by content hash
+
+**Expected Time**: ~30-60 minutes (with delays to respect rate limits)
+
+---
+
+### STEP 2: Process & Filter Articles
+
+#### 2.1 Run Pipeline (Segment + Normalize)
+
+**Script**: `scripts/run_pipeline.py`
+
+```bash
+python scripts/run_pipeline.py
+
+# Pipeline steps:
+# 1. Sentence segmentation (underthesea)
+# 2. Text normalization (lowercase, strip)
+# 3. Deduplication (similar sentences)
+# 4. Save to 'sentences' table
+```
+
+**What it does**:
+```python
+# For each article:
+Article.content 
+  → Segmenter.segment() 
+  → ["Sentence 1", "Sentence 2", ...]
+  → Normalizer.normalize()
+  → Deduplicator.check()
+  → Save to Sentence model
+```
+
+**Output**:
+```
+PIPELINE COMPLETED
+==========================================
+Articles processed: 1250
+Total sentences:    45,000
+==========================================
+```
+
+#### 2.2 Filter Quality
+
+**Script**: `scripts/filter_quality.py`
+
+```bash
+python scripts/filter_quality.py
+
+# Removes articles that:
+# - Too short (< 200 chars)
+# - Too long (> 50,000 chars)
+# - Too few words (< 20 words)
+# - Empty clean_text
+```
+
+**Quality Criteria**:
+```python
+VALID_ARTICLE = {
+    'min_length': 200,
+    'max_length': 50000,
+    'min_words': 20,
+    'has_clean_text': True
+}
+```
+
+**Expected Result**:
+- Remove ~10-15% low-quality articles
+- Keep ~1100-1150 high-quality articles
+- ~40,000 clean sentences
+
+---
+
+### STEP 3: Prepare Training Data
+
+**Script**: `scripts/prepare_training_data.py`
+
+```bash
+python scripts/prepare_training_data.py
+
+# Output:
+# data/training/
+#   ├── train.json (70%)
+#   ├── val.json   (15%)
+#   └── test.json  (15%)
+```
+
+#### How Auto-Labeling Works:
+
+```python
+# Uses Dictionary + Rule-based extractors to label entities
+# Format: BIO tagging
+
+Input:  "Bệnh nhân bị viêm phổi và sốt cao"
+Output: [
+  {"token": "Bệnh", "tag": "O"},
+  {"token": "nhân", "tag": "O"},
+  {"token": "bị", "tag": "O"},
+  {"token": "viêm", "tag": "B-DISEASE"},
+  {"token": "phổi", "tag": "I-DISEASE"},
+  {"token": "và", "tag": "O"},
+  {"token": "sốt", "tag": "B-SYMPTOM"},
+  {"token": "cao", "tag": "I-SYMPTOM"}
+]
+```
+
+**Data Preparation Flow**:
+```python
+# 1. Load sentences from database
+SELECT * FROM sentences 
+WHERE is_medical = True 
+AND is_duplicate = False
+
+# 2. Apply Dictionary + Rule extractors
+DataPreparator.create_dataset(sentences)
+
+# 3. Convert to BIO format
+# 4. Split: 70% train / 15% val / 15% test
+# 5. Save as JSON
+```
+
+**Expected Output**:
+```
+Loaded 40,000 sentences from database
+Created 35,000 labeled samples (good entity coverage)
+Train: 24,500, Val: 5,250, Test: 5,250
+Training data saved to data/training/
+```
+
+**Sample JSON Format**:
+```json
+{
+  "id": "sent-001",
+  "tokens": ["Bệnh", "nhân", "bị", "viêm", "phổi"],
+  "tags": ["O", "O", "O", "B-DISEASE", "I-DISEASE"],
+  "text": "Bệnh nhân bị viêm phổi"
+}
+```
+
+---
+
+### STEP 4: Train PhoBERT
+
+**Script**: `scripts/train_phobert.py`
+
+```bash
+python scripts/train_phobert.py
+
+# Training parameters:
+# - Base model: vinai/phobert-base
+# - Learning rate: 2e-5
+# - Batch size: 16
+# - Epochs: 5
+# - Output: models/phobert-medical/
+```
+
+#### Training Configuration:
+
+```python
+trainer = PhoBERTNERTrainer(
+    model_name="vinai/phobert-base"  # Vietnamese BERT
+)
+
+trainer.train(
+    train_dataset=train_dataset,     # 24,500 samples
+    val_dataset=val_dataset,         # 5,250 samples
+    output_dir="models/phobert-medical",
+    num_epochs=5,
+    learning_rate=2e-5,
+    batch_size=16,
+    warmup_steps=500,
+    weight_decay=0.01,
+    evaluation_strategy="epoch",
+    save_strategy="epoch",
+    load_best_model_at_end=True
+)
+```
+
+#### Training Output:
+
+```
+Epoch 1/5
+==========
+Train Loss: 0.245 | Val Loss: 0.198 | F1: 0.72
+Saving checkpoint...
+
+Epoch 2/5
+==========
+Train Loss: 0.156 | Val Loss: 0.143 | F1: 0.78
+Saving checkpoint...
+
+...
+
+Epoch 5/5
+==========
+Train Loss: 0.089 | Val Loss: 0.102 | F1: 0.85
+✓ Best model saved!
+
+Training completed!
+Model saved to: models/phobert-medical/final_model/
+```
+
+**Expected Time**: 2-4 hours (GPU) / 12-24 hours (CPU)
+
+**Model Output**:
+```
+models/phobert-medical/
+├── final_model/
+│   ├── config.json
+│   ├── pytorch_model.bin
+│   ├── tokenizer_config.json
+│   ├── vocab.txt
+│   └── special_tokens_map.json
+├── checkpoint-epoch-1/
+├── checkpoint-epoch-2/
+└── training_logs.json
+```
+
+---
+
+### STEP 5: Evaluate & Export
+
+#### 5.1 Evaluate Model
+
+**Script**: `scripts/evaluate_model.py`
+
+```bash
+python scripts/evaluate_model.py \
+  --model-path models/phobert-medical/final_model \
+  --test-data data/training/test.json
+
+# Output:
+# ==========================================
+# EVALUATION RESULTS
+# ==========================================
+# 
+# Overall Metrics:
+#   Precision: 0.86
+#   Recall:    0.84
+#   F1 Score:  0.85
+# 
+# Per-Entity Metrics:
+#   DISEASE:    P=0.88  R=0.86  F1=0.87
+#   DRUG:       P=0.91  R=0.89  F1=0.90
+#   SYMPTOM:    P=0.82  R=0.80  F1=0.81
+#   TREATMENT:  P=0.85  R=0.83  F1=0.84
+#   BODY_PART:  P=0.87  R=0.85  F1=0.86
+#   TEST:       P=0.89  R=0.86  F1=0.87
+# ==========================================
+```
+
+#### 5.2 Export Model
+
+**Script**: `scripts/export_model.py`
+
+```bash
+python scripts/export_model.py \
+  --input models/phobert-medical/final_model \
+  --output models/phobert-medical-production
+
+# Creates production-ready model package
+```
+
+#### 5.3 Update Production
+
+```bash
+# Copy trained model to production path
+cp -r models/phobert-medical/final_model models/phobert-medical/
+
+# Restart API server
+uvicorn app.main:app --reload --port 8000
+
+# Test ensemble with new model
+curl -X POST http://localhost:8000/api/ner/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Bệnh nhân bị viêm phổi, điều trị bằng amoxicillin"}'
+```
+
+---
+
+### Complete Pipeline Command Sequence
+
+```bash
+# ========================================
+# FULL PIPELINE - Run in order
+# ========================================
+
+cd backend
+
+# 1. Crawl data (~30-60 min)
+python scripts/crawl_batch.py
+
+# 2. Process articles (~5-10 min)
+python scripts/run_pipeline.py
+
+# 3. Filter quality (~1 min)
+python scripts/filter_quality.py
+
+# 4. Prepare training data (~2-5 min)
+python scripts/prepare_training_data.py
+
+# 5. Train PhoBERT (~2-4 hours GPU / 12-24 hours CPU)
+python scripts/train_phobert.py
+
+# 6. Evaluate model (~5 min)
+python scripts/evaluate_model.py
+
+# 7. Export to production (~1 min)
+python scripts/export_model.py
+
+# ========================================
+# Total time: ~3-5 hours (with GPU)
+# ========================================
+```
+
+---
+
+### Data Statistics (After Pipeline)
+
+```
+Raw Articles (crawled):      ~1,250
+After Quality Filter:        ~1,100
+Total Sentences:             ~40,000
+Labeled Samples:             ~35,000
+  ├── Train:                 24,500 (70%)
+  ├── Validation:            5,250  (15%)
+  └── Test:                  5,250  (15%)
+
+Entity Distribution:
+  ├── DISEASE:               ~12,000
+  ├── SYMPTOM:               ~8,500
+  ├── DRUG:                  ~7,000
+  ├── TREATMENT:             ~4,500
+  ├── BODY_PART:             ~2,500
+  └── TEST:                  ~2,000
+```
+
+---
+
 ## 🚀 Setup & Installation
 
 ### Prerequisites
