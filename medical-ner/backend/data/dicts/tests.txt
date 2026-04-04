@@ -1,0 +1,57 @@
+xét nghiệm máu
+xét nghiệm nước tiểu
+xét nghiệm phân
+xét nghiệm đờm
+sinh thiết
+chụp x-quang
+chụp ct
+chụp ct scan
+chụp mri
+siêu âm
+siêu âm bụng
+siêu âm tim
+nội soi dạ dày
+nội soi đại tràng
+nội soi phế quản
+điện tim
+điện não đồ
+đo huyết áp
+đo đường huyết
+đo hba1c
+xét nghiệm chức năng gan
+xét nghiệm chức năng thận
+xét nghiệm mỡ máu
+xét nghiệm điện giải
+xét nghiệm đông máu
+xét nghiệm hormone
+xét nghiệm tuyến giáp
+xét nghiệm psa
+xét nghiệm hiv
+xét nghiệm viêm gan b
+xét nghiệm viêm gan c
+xét nghiệm sars-cov-2
+pcr
+test nhanh
+cấy vi khuẩn
+kháng sinh đồ
+xét nghiệm tế bào
+chọc dịch màng phổi
+chọc dịch màng bụng
+chọc tủy sống
+sinh thiết tủy xương
+chụp pet
+chụp spect
+xạ hình xương
+đo mật độ xương
+đo chức năng hô hấp
+thăm dò chức năng
+test dị ứng
+test tuberculin
+nội soi tai mũi họng
+soi đáy mắt
+đo nhãn áp
+thính lực đồ
+thăm dò điện sinh lý tim
+siêu âm doppler
+chụp mạch
+chụp niệu đồ

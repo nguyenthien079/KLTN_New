@@ -1,0 +1,53 @@
+# Ignore all files in root
+*.md
+*.docx
+*.doc
+
+# Specific files to ignore
+IMPLEMENTATION_SUMMARY.md
+SOFTWARE REQUIREMENT SPECIFICATION.docx
+SOURCE_CODE_ANALYSIS.md
+crawl_plan.md
+plan_coding.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+.npm
+.next/
+out/
+build/
+dist/
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/

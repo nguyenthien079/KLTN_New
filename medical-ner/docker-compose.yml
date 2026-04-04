@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: medical_ner_postgres
+    environment:
+      POSTGRES_USER: medical_user
+      POSTGRES_PASSWORD: medical_pass_2024
+      POSTGRES_DB: medical_ner
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - medical_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medical_user -d medical_ner"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medical_ner_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://medical_user:medical_pass_2024@postgres:5432/medical_ner
+      SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
+      ENVIRONMENT: production
+      DEBUG: "false"
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/models:/app/models
+    ports:
+      - "8000:8000"
+    networks:
+      - medical_net
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Waiting for postgres...' &&
+        sleep 5 &&
+        alembic upgrade head &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+      "
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: medical_ner_frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - medical_net
+    restart: unless-stopped
+
+networks:
+  medical_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
