@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "author": "Nguyen Thien <nguyenthien079@gmail.com>",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

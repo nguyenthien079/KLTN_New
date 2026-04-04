@@ -1134,9 +1134,10 @@ MIT License
 
 ## 👥 Contributors
 
-- **Backend**: FastAPI + ML Pipeline
-- **Frontend**: React UI
-- **ML**: PhoBERT fine-tuning & Ensemble
+- **Nguyen Thien** ([@nguyenthien079](https://github.com/nguyenthien079))
+  - Backend: FastAPI + ML Pipeline
+  - Frontend: React UI
+  - ML: PhoBERT fine-tuning & Ensemble
 
 ---
 
