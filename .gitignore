@@ -1,14 +1,17 @@
-# Ignore MD files in root only (not subdirectories)
-/*.md
-/*.docx
-/*.doc
-
-# Specific files to ignore
+# Specific files to ignore in root
 IMPLEMENTATION_SUMMARY.md
 SOFTWARE REQUIREMENT SPECIFICATION.docx
 SOURCE_CODE_ANALYSIS.md
 crawl_plan.md
 plan_coding.md
+
+# Ignore doc files in root
+/*.docx
+/*.doc
+
+# Allow README.md but ignore other MD in root
+/*.md
+!README.md
 
 # Python
 __pycache__/
