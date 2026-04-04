@@ -3,6 +3,7 @@ from app.models.article import Article, CrawlStatus
 from app.models.sentence import Sentence, PipelineStatus
 from app.models.entity import Entity, EntityType
 from app.models.knowledge_map import KnowledgeMap
+from app.models.correction import Correction
 
 __all__ = [
     "Base",
@@ -10,6 +11,7 @@ __all__ = [
     "Sentence",
     "Entity",
     "KnowledgeMap",
+    "Correction",
     "CrawlStatus",
     "PipelineStatus",
     "EntityType",

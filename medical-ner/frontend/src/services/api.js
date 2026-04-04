@@ -34,4 +34,14 @@ export const getCrawlStatus = async (jobId) => {
   return response.data;
 };
 
+export const submitFeedback = async (data) => {
+  const response = await api.post('/api/feedback/submit', data);
+  return response.data;
+};
+
+export const exportFeedback = async () => {
+  const response = await api.get('/api/feedback/export');
+  return response.data;
+};
+
 export default api;

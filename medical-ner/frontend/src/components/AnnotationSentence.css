@@ -1,0 +1,41 @@
+.annotation-sentence {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #1f2937;
+  user-select: text;
+  cursor: text;
+  padding: 8px 0;
+}
+
+.annotation-entity-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 2px;
+  border-radius: 4px;
+  border: 1px solid;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.annotation-entity-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  filter: brightness(0.95);
+}
+
+.annotation-entity-tag:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.annotation-entity-label {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.7;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
