@@ -976,23 +976,49 @@ Entity Distribution:
 - Python 3.11+
 - Node.js 18+
 - PostgreSQL 14+
+- Git LFS (for downloading database dump)
 
-### 1. Database Setup
+### Quick Start (Complete Guide)
 
-#### Create Database & User
+#### Step 1: Clone Repository
+
+```bash
+# Install Git LFS first (if not installed)
+git lfs install
+
+# Clone repository (Git LFS will auto-download 570 MB database file)
+git clone https://github.com/nguyenthien079/KLTN_New.git
+cd KLTN_New
+
+# Verify LFS file downloaded
+ls -lh medical-ner/backend/data/sql/medical_ner_data.sql
+# Should show ~570 MB
+```
+
+#### Step 2: Database Setup
+
+#### Step 2: Database Setup
+
+**2.1. Create Database & User**
 
 ```bash
 # Connect to PostgreSQL
 psql -U postgres
 
-# Create database and user
+# In psql prompt, run:
 CREATE DATABASE medical_ner;
 CREATE USER medical_user WITH PASSWORD 'medical_pass_2024';
 GRANT ALL PRIVILEGES ON DATABASE medical_ner TO medical_user;
+
+# Grant additional permissions
+\c medical_ner
+GRANT ALL ON SCHEMA public TO medical_user;
+
+# Exit psql
 \q
 ```
 
-#### Import Sample Data (Recommended)
+**2.2. Import Sample Data (Recommended)**
 
 We provide a **full database dump** with 1,240 articles and 28,653 sentences:
 
@@ -1007,14 +1033,31 @@ $env:PGPASSWORD='medical_pass_2024'    # Windows PowerShell
 # Import data (~3-5 minutes for 570 MB)
 psql -U medical_user -h localhost -d medical_ner -f medical_ner_data.sql
 
-# Verify
-psql -U medical_user -h localhost -d medical_ner -c "SELECT COUNT(*) FROM articles;"
-# Should return: 1240
+# Verify import
+psql -U medical_user -h localhost -d medical_ner -c "
+SELECT 'articles' as table, COUNT(*) as rows FROM articles
+UNION ALL
+SELECT 'sentences', COUNT(*) FROM sentences;
+"
+```
+
+Expected output:
+```
+  table    | rows
+-----------+-------
+ articles  | 1240
+ sentences | 28653
 ```
 
 📖 **Detailed import guide**: See `backend/data/sql/README.md`
 
-### 2. Backend Setup
+**2.3. Alternative: Skip Import (Start with Empty DB)**
+
+If you want to crawl your own data instead:
+- Run migrations only: `alembic upgrade head`
+- Then use the `/api/crawl/start` endpoint
+
+#### Step 3: Backend Setup
 
 ```bash
 cd backend
@@ -1043,19 +1086,48 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 3. Frontend Setup
+#### Step 4: Frontend Setup
+
+Open a **new terminal window** (keep backend running):
 
 ```bash
-cd frontend
+cd medical-ner/frontend
 
 # Install dependencies
 npm install
 
-# Run dev server
-npm run dev  # Port 5173
+# Create .env file (optional, defaults work)
+echo "VITE_API_URL=http://localhost:8000" > .env
+
+# Start dev server
+npm run dev
 ```
 
-### 4. Docker Setup (Alternative)
+Frontend should now be running at: **http://localhost:5173**
+
+Open browser and visit: **http://localhost:5173**
+
+---
+
+### ✅ Verification
+
+After all steps, you should have:
+
+1. ✅ **PostgreSQL** running with medical_ner database
+2. ✅ **Backend API** at http://localhost:8000
+3. ✅ **Frontend UI** at http://localhost:5173
+4. ✅ **1,240 articles** + **28,653 sentences** in database
+
+Test the full workflow:
+1. Open http://localhost:5173
+2. Enter text: "Bệnh nhân bị viêm phổi và sốt cao"
+3. Click "Phân tích"
+4. Should see highlighted entities (DISEASE, SYMPTOM)
+5. Click "Gán nhãn lại" to try Phase 2 annotation features
+
+---
+
+### 🐳 Docker Setup (Alternative)
 
 ```bash
 # From project root
