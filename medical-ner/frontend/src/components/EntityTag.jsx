@@ -1,34 +1,28 @@
 import React from 'react';
-import { ENTITY_COLORS } from '../config/entityColors';
+import { ENTITY_CONFIG } from '../config/entityConfig';
 
 const EntityTag = ({ type, text, confidence }) => {
-  const colors = ENTITY_COLORS[type] || {
-    bg: '#f3f4f6',
-    border: '#9ca3af',
-    text: '#374151',
+  const config = ENTITY_CONFIG[type] || {
+    bg: '#f1f5f9',
+    border: '#94a3b8',
+    text: '#334155',
     label: type
   };
 
+  const pct = confidence != null ? `${(confidence * 100).toFixed(1)}%` : null;
+
   return (
     <span
+      className="entity-tag"
       style={{
-        display: 'inline-block',
-        padding: '2px 8px',
-        margin: '0 4px',
-        backgroundColor: colors.bg,
-        border: `2px solid ${colors.border}`,
-        borderRadius: '4px',
-        color: colors.text,
-        fontSize: '14px',
-        fontWeight: '600',
-        cursor: 'help',
+        backgroundColor: config.bg,
+        borderColor: config.border,
+        color: config.text
       }}
-      title={`${colors.label} - Confidence: ${(confidence * 100).toFixed(1)}%`}
+      title={pct ? `${config.label} · Độ tin cậy: ${pct}` : config.label}
     >
       {text}
-      <span style={{ fontSize: '11px', marginLeft: '4px', opacity: 0.7 }}>
-        ({colors.label})
-      </span>
+      <span className="entity-tag-label">{config.label}</span>
     </span>
   );
 };

@@ -2,32 +2,32 @@ import React from 'react';
 import EntityTag from './EntityTag';
 
 const HighlightedSentence = ({ sentence, entities }) => {
-  const sortedEntities = [...entities].sort((a, b) => a.start - b.start);
+  const sorted = [...entities].sort((a, b) => a.start - b.start);
 
   const parts = [];
-  let lastIndex = 0;
+  let cursor = 0;
 
-  for (const entity of sortedEntities) {
-    if (entity.start > lastIndex) {
-      parts.push({ type: 'text', content: sentence.slice(lastIndex, entity.start) });
+  for (const entity of sorted) {
+    if (entity.start > cursor) {
+      parts.push({ kind: 'text', content: sentence.slice(cursor, entity.start) });
     }
     parts.push({
-      type: 'entity',
+      kind: 'entity',
       content: entity.text,
       entityType: entity.type,
       confidence: entity.confidence
     });
-    lastIndex = entity.end;
+    cursor = entity.end;
   }
 
-  if (lastIndex < sentence.length) {
-    parts.push({ type: 'text', content: sentence.slice(lastIndex) });
+  if (cursor < sentence.length) {
+    parts.push({ kind: 'text', content: sentence.slice(cursor) });
   }
 
   return (
-    <div style={{ marginBottom: '16px', lineHeight: '2' }}>
+    <p className="highlighted-sentence">
       {parts.map((part, idx) =>
-        part.type === 'text' ? (
+        part.kind === 'text' ? (
           <span key={idx}>{part.content}</span>
         ) : (
           <EntityTag
@@ -38,7 +38,7 @@ const HighlightedSentence = ({ sentence, entities }) => {
           />
         )
       )}
-    </div>
+    </p>
   );
 };
 
