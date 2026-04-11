@@ -70,7 +70,8 @@ class BIOToken(BaseModel):
 @router.post("/submit", response_model=SubmitResponse)
 async def submit_corrections(
     request: SubmitRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     Save human corrections to database.
@@ -78,14 +79,14 @@ async def submit_corrections(
     """
     try:
         saved_count = 0
-        
+
         for item in request.corrections:
             correction = Correction(
                 original_text=item.original_text,
                 original_entities=[e.model_dump() for e in item.original_entities],
                 corrected_entities=[e.model_dump() for e in item.corrected_entities],
                 status=item.status,
-                labeler_id=None,
+                labeler_id=user.id,
             )
             db.add(correction)
             saved_count += 1

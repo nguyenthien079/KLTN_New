@@ -22,6 +22,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('auth_user');
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const analyzeText = async (text) => {
   const response = await api.post('/api/ner/analyze-text', { text });
   return response.data;
@@ -114,6 +125,11 @@ export const getPipelineStatus = async (jobId) => {
 
 export const startPipeline = async () => {
   const response = await api.post('/api/pipeline/process', {});
+  return response.data;
+};
+
+export const getMe = async () => {
+  const response = await api.get('/api/auth/me');
   return response.data;
 };
 

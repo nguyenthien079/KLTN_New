@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.auth import require_admin
+from app.models.user import User
 
 router = APIRouter()
 
@@ -22,6 +24,7 @@ async def process_articles(
     request: ProcessRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
 ):
     """Start a pipeline processing job"""
     job_id = str(uuid.uuid4())
@@ -79,7 +82,10 @@ async def run_pipeline_job(job_id: str, article_id: Optional[int]):
 
 
 @router.post("/filter")
-async def start_filter(background_tasks: BackgroundTasks):
+async def start_filter(
+    background_tasks: BackgroundTasks,
+    _: User = Depends(require_admin),
+):
     """Run filter_quality as background job"""
     job_id = str(uuid.uuid4())
     filter_jobs[job_id] = {"status": "running", "logs": [], "result": {}}
