@@ -34,6 +34,16 @@ export const getCrawlStatus = async (jobId) => {
   return response.data;
 };
 
+export const startDiscovery = async (url) => {
+  const response = await api.post('/api/crawl/discover', { url });
+  return response.data;
+};
+
+export const getDiscoveryStatus = async (jobId) => {
+  const response = await api.get(`/api/crawl/discover/${jobId}`);
+  return response.data;
+};
+
 export const submitFeedback = async (data) => {
   const response = await api.post('/api/feedback/submit', data);
   return response.data;
