@@ -1,20 +1,39 @@
 import React, { useState } from 'react';
 import { analyzeText, analyzeUrl } from './services/api';
+import { useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import InputPanel from './components/InputPanel';
 import EntityLegend from './components/EntityLegend';
 import ResultsPanel from './components/ResultsPanel';
 import SystemStats from './components/SystemStats';
 import CrawlPage from './components/CrawlPage';
+import PipelinePage from './components/PipelinePage';
+import ReviewPage from './components/ReviewPage';
+import UsersPage from './components/UsersPage';
+import LoginPage from './components/LoginPage';
 import './App.css';
 
 function App() {
+  const { user, logout } = useAuth();
+
   const [inputType, setInputType] = useState('text');
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('ner');
+
+  if (!user) return <LoginPage />;
+
+  const tabs = [
+    { id: 'ner', label: 'Phân tích NER' },
+    { id: 'crawl', label: 'Thu thập dữ liệu' },
+    { id: 'pipeline', label: 'Pipeline' },
+    ...(user.role === 'admin' ? [
+      { id: 'review', label: 'Duyệt nhãn' },
+      { id: 'users', label: 'Người dùng' },
+    ] : []),
+  ];
 
   const handleTypeChange = (type) => {
     setInputType(type);
@@ -28,11 +47,9 @@ function App() {
       setError('Vui lòng nhập nội dung cần phân tích.');
       return;
     }
-
     setLoading(true);
     setError(null);
     setResults(null);
-
     try {
       const data =
         inputType === 'text'
@@ -68,18 +85,23 @@ function App() {
 
       <nav className="tab-nav">
         <div className="tab-nav-inner">
-          <button
-            className={`tab-btn${tab === 'ner' ? ' tab-btn--active' : ''}`}
-            onClick={() => handleTabChange('ner')}
-          >
-            Phân tích NER
-          </button>
-          <button
-            className={`tab-btn${tab === 'crawl' ? ' tab-btn--active' : ''}`}
-            onClick={() => handleTabChange('crawl')}
-          >
-            Thu thập dữ liệu
-          </button>
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              className={`tab-btn${tab === t.id ? ' tab-btn--active' : ''}`}
+              onClick={() => handleTabChange(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+          <div className="tab-nav-user">
+            <span className="tab-nav-username">
+              {user.display_name || user.username}
+            </span>
+            <button className="tab-nav-logout" onClick={logout}>
+              Đăng xuất
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -99,13 +121,14 @@ function App() {
               />
               <EntityLegend />
             </div>
-
             {results && <ResultsPanel results={results} />}
-
             <SystemStats />
           </>
         )}
         {tab === 'crawl' && <CrawlPage />}
+        {tab === 'pipeline' && <PipelinePage />}
+        {tab === 'review' && <ReviewPage />}
+        {tab === 'users' && <UsersPage />}
       </div>
 
       <footer className="site-footer">

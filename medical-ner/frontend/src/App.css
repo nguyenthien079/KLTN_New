@@ -683,3 +683,35 @@
   border-bottom-color: var(--color-primary);
   font-weight: 600;
 }
+
+/* Tab nav user area */
+.tab-nav-inner {
+  justify-content: flex-start;
+}
+
+.tab-nav-user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tab-nav-username {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.tab-nav-logout {
+  padding: 5px 14px;
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.tab-nav-logout:hover {
+  color: var(--color-error, #dc2626);
+  border-color: #fca5a5;
+}
