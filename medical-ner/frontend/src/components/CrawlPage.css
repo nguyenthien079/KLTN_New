@@ -33,16 +33,6 @@
   border-color: var(--color-primary);
 }
 
-.crawl-pages-input {
-  width: 90px;
-  padding: 10px 10px;
-  text-align: center;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 0.95rem;
-  background: var(--color-bg);
-  color: var(--color-text);
-}
 
 .crawl-btn {
   padding: 10px 22px;
@@ -110,6 +100,20 @@
   height: 100%;
   background: var(--color-primary);
   border-radius: 4px;
+}
+
+@keyframes crawl-slide {
+  0%   { transform: translateX(-100%); width: 40%; }
+  100% { transform: translateX(300%);  width: 40%; }
+}
+
+.crawl-progress-fill--indeterminate {
+  width: 40%;
+  animation: crawl-slide 1.4s ease-in-out infinite;
+}
+
+.crawl-progress-fill--done {
+  width: 100%;
   transition: width 0.4s ease;
 }
 

@@ -24,8 +24,8 @@ export const getStats = async () => {
   return response.data;
 };
 
-export const startCrawl = async (url, maxPages = 100) => {
-  const response = await api.post('/api/crawl/start', { url, max_pages: maxPages });
+export const startCrawl = async (url) => {
+  const response = await api.post('/api/crawl/start', { url });
   return response.data;
 };
 

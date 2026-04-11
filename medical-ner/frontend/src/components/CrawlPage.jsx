@@ -4,7 +4,6 @@ import './CrawlPage.css';
 
 export default function CrawlPage() {
   const [url, setUrl] = useState('');
-  const [maxPages, setMaxPages] = useState(100);
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState(null); // null | 'running' | 'completed' | 'failed'
   const [progress, setProgress] = useState({ pages_crawled: 0, max_pages: 0 });
@@ -51,21 +50,16 @@ export default function CrawlPage() {
     }
     setError(null);
     setLogs([]);
-    setProgress({ pages_crawled: 0, max_pages: maxPages });
+    setProgress({ pages_crawled: 0 });
     setStatus('running');
     try {
-      const data = await startCrawl(url.trim(), maxPages);
+      const data = await startCrawl(url.trim());
       setJobId(data.job_id);
     } catch (err) {
       setStatus('failed');
       setError(err.response?.data?.detail || 'Không thể bắt đầu crawl.');
     }
   };
-
-  const percent =
-    progress.max_pages > 0
-      ? Math.round((progress.pages_crawled / progress.max_pages) * 100)
-      : 0;
 
   return (
     <div className="crawl-page">
@@ -78,16 +72,6 @@ export default function CrawlPage() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             disabled={status === 'running'}
-          />
-          <input
-            className="crawl-pages-input"
-            type="number"
-            min={1}
-            max={500}
-            value={maxPages}
-            onChange={(e) => setMaxPages(Number(e.target.value))}
-            disabled={status === 'running'}
-            title="Số trang tối đa"
           />
           <button
             className="crawl-btn"
@@ -109,15 +93,12 @@ export default function CrawlPage() {
               {status === 'failed' && '✗ Lỗi'}
             </span>
             <span className="crawl-count">
-              {progress.pages_crawled} / {progress.max_pages} trang
+              {progress.pages_crawled} trang đã crawl
             </span>
           </div>
 
           <div className="crawl-progress-bar">
-            <div
-              className="crawl-progress-fill"
-              style={{ width: `${percent}%` }}
-            />
+            <div className={`crawl-progress-fill${status === 'running' ? ' crawl-progress-fill--indeterminate' : ' crawl-progress-fill--done'}`} />
           </div>
 
           <div className="crawl-log" ref={logRef}>
@@ -129,7 +110,7 @@ export default function CrawlPage() {
             ))}
             {status === 'completed' && (
               <div className="crawl-log-line crawl-log-done">
-                ✓ Crawl hoàn tất — {progress.pages_crawled} bài đã lưu vào database.
+                ✓ Crawl hoàn tất — lưu {progress.pages_crawled} bài vào database.
               </div>
             )}
             {status === 'failed' && (

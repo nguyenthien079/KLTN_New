@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -12,7 +12,7 @@ crawl_jobs: dict = {}
 
 class CrawlStartRequest(BaseModel):
     url: str
-    max_pages: Optional[int] = Field(default=100, ge=1, le=500)
+    max_pages: Optional[int] = None
 
 
 class CrawlStatusResponse(BaseModel):
@@ -34,7 +34,6 @@ async def start_crawl(
         "status": "running",
         "url": request.url,
         "pages_crawled": 0,
-        "max_pages": request.max_pages,
         "logs": []
     }
 
@@ -65,7 +64,6 @@ async def get_crawl_status(job_id: str):
         status=job["status"],
         progress={
             "pages_crawled": job.get("pages_crawled", 0),
-            "max_pages": job.get("max_pages", 0)
         },
         logs=job.get("logs", [])
     )
@@ -77,7 +75,7 @@ async def list_crawl_history():
     return {"jobs": list(crawl_jobs.values())}
 
 
-async def run_crawl_job(job_id: str, url: str, max_pages: int):
+async def run_crawl_job(job_id: str, url: str, max_pages: Optional[int]):
     """Background task that runs the crawler"""
     from app.database import AsyncSessionLocal
     from app.crawler.crawler import MedicalCrawler
@@ -90,7 +88,7 @@ async def run_crawl_job(job_id: str, url: str, max_pages: int):
                 crawl_jobs[job_id]["pages_crawled"] = count
                 label = title.strip()[:70] if title.strip() else page_url
                 crawl_jobs[job_id]["logs"].append(
-                    f"[{count}/{max_pages}] {label}"
+                    f"[{count}] {label}"
                 )
 
             articles = await crawler.crawl_site(
