@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { startCrawl, getCrawlStatus } from '../services/api';
+import DiscoverPage from './DiscoverPage';
 import './CrawlPage.css';
 
 export default function CrawlPage() {
+  const [subTab, setSubTab] = useState('discover');
   const [url, setUrl] = useState('');
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState(null); // null | 'running' | 'completed' | 'failed'
@@ -63,7 +65,25 @@ export default function CrawlPage() {
 
   return (
     <div className="crawl-page">
-      <div className="crawl-form">
+      {/* Sub-tab nav */}
+      <div className="crawl-subtab-nav">
+        <button
+          className={`crawl-subtab-btn${subTab === 'discover' ? ' crawl-subtab-btn--active' : ''}`}
+          onClick={() => setSubTab('discover')}
+        >
+          Tìm site
+        </button>
+        <button
+          className={`crawl-subtab-btn${subTab === 'crawl' ? ' crawl-subtab-btn--active' : ''}`}
+          onClick={() => setSubTab('crawl')}
+        >
+          Crawl
+        </button>
+      </div>
+
+      {subTab === 'discover' && <DiscoverPage />}
+
+      {subTab === 'crawl' && <div className="crawl-form">
         <div className="crawl-input-row">
           <input
             className="crawl-url-input"
@@ -82,9 +102,9 @@ export default function CrawlPage() {
           </button>
         </div>
         {error && <p className="crawl-error">{error}</p>}
-      </div>
+      </div>}
 
-      {status && (
+      {subTab === 'crawl' && status && (
         <div className="crawl-monitor">
           <div className="crawl-status-row">
             <span className={`crawl-badge crawl-badge--${status}`}>
