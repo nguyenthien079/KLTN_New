@@ -24,6 +24,7 @@ export default function CrawlPage() {
   useEffect(() => {
     if (!jobId || status === 'completed' || status === 'failed') return;
 
+    clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
         const data = await getCrawlStatus(jobId);

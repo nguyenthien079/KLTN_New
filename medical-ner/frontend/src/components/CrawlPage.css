@@ -92,7 +92,7 @@
 
 .crawl-badge--running   { background: #fef3c7; color: #92400e; }
 .crawl-badge--completed { background: #d1fae5; color: #065f46; }
-.crawl-badge--failed    { background: #fee2e2; color: #991b1b; }
+.crawl-badge--failed    { background: var(--color-error-bg); color: var(--color-error); }
 
 .crawl-count {
   font-size: 0.88rem;
