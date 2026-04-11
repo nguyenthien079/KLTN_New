@@ -49,8 +49,16 @@ function App() {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (tab === 'ner' && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       handleAnalyze();
+    }
+  };
+
+  const handleTabChange = (newTab) => {
+    setTab(newTab);
+    if (newTab !== 'ner') {
+      setLoading(false);
+      setError(null);
     }
   };
 
@@ -62,13 +70,13 @@ function App() {
         <div className="tab-nav-inner">
           <button
             className={`tab-btn${tab === 'ner' ? ' tab-btn--active' : ''}`}
-            onClick={() => setTab('ner')}
+            onClick={() => handleTabChange('ner')}
           >
             Phân tích NER
           </button>
           <button
             className={`tab-btn${tab === 'crawl' ? ' tab-btn--active' : ''}`}
-            onClick={() => setTab('crawl')}
+            onClick={() => handleTabChange('crawl')}
           >
             Thu thập dữ liệu
           </button>

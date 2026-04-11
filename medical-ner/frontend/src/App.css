@@ -678,7 +678,7 @@
   color: var(--color-text);
 }
 
-.tab-btn--active {
+.tab-nav .tab-btn--active {
   color: var(--color-primary);
   border-bottom-color: var(--color-primary);
   font-weight: 600;
