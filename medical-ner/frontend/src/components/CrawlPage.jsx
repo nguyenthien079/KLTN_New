@@ -22,7 +22,7 @@ export default function CrawlPage() {
 
   // Polling — starts when jobId is set, stops when done
   useEffect(() => {
-    if (!jobId || status === 'completed' || status === 'failed') return;
+    if (!jobId) return;
 
     clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
@@ -36,11 +36,13 @@ export default function CrawlPage() {
         }
       } catch {
         clearInterval(pollRef.current);
+        setStatus('failed');
+        setError('Mất kết nối — không thể theo dõi tiến trình crawl.');
       }
     }, 2000);
 
     return () => clearInterval(pollRef.current);
-  }, [jobId, status]);
+  }, [jobId]);
 
   const handleStart = async () => {
     if (!url.trim()) {
