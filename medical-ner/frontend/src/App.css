@@ -645,3 +645,41 @@
   border-color: #dc2626;
   color: #991b1b;
 }
+
+/* Tab Navigation */
+.tab-nav {
+  background: var(--color-surface, #fff);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab-nav-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  gap: 4px;
+}
+
+.tab-nav .tab-btn {
+  padding: 12px 20px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--color-text-muted, #64748b);
+  transition: color 0.15s, border-color 0.15s;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.tab-nav .tab-btn:hover {
+  color: var(--color-text);
+}
+
+.tab-btn--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: 600;
+}

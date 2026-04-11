@@ -5,6 +5,7 @@ import InputPanel from './components/InputPanel';
 import EntityLegend from './components/EntityLegend';
 import ResultsPanel from './components/ResultsPanel';
 import SystemStats from './components/SystemStats';
+import CrawlPage from './components/CrawlPage';
 import './App.css';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
+  const [tab, setTab] = useState('ner');
 
   const handleTypeChange = (type) => {
     setInputType(type);
@@ -56,24 +58,46 @@ function App() {
     <div className="page" onKeyDown={handleKeyDown}>
       <Header />
 
-      <div className="content-wrap">
-        <div className="main-grid">
-          <InputPanel
-            inputType={inputType}
-            inputValue={inputValue}
-            loading={loading}
-            error={error}
-            onTypeChange={handleTypeChange}
-            onValueChange={setInputValue}
-            onAnalyze={handleAnalyze}
-            onSample={(text) => { setInputValue(text); setResults(null); setError(null); }}
-          />
-          <EntityLegend />
+      <nav className="tab-nav">
+        <div className="tab-nav-inner">
+          <button
+            className={`tab-btn${tab === 'ner' ? ' tab-btn--active' : ''}`}
+            onClick={() => setTab('ner')}
+          >
+            Phân tích NER
+          </button>
+          <button
+            className={`tab-btn${tab === 'crawl' ? ' tab-btn--active' : ''}`}
+            onClick={() => setTab('crawl')}
+          >
+            Thu thập dữ liệu
+          </button>
         </div>
+      </nav>
 
-        {results && <ResultsPanel results={results} />}
+      <div className="content-wrap">
+        {tab === 'ner' && (
+          <>
+            <div className="main-grid">
+              <InputPanel
+                inputType={inputType}
+                inputValue={inputValue}
+                loading={loading}
+                error={error}
+                onTypeChange={handleTypeChange}
+                onValueChange={setInputValue}
+                onAnalyze={handleAnalyze}
+                onSample={(text) => { setInputValue(text); setResults(null); setError(null); }}
+              />
+              <EntityLegend />
+            </div>
 
-        <SystemStats />
+            {results && <ResultsPanel results={results} />}
+
+            <SystemStats />
+          </>
+        )}
+        {tab === 'crawl' && <CrawlPage />}
       </div>
 
       <footer className="site-footer">
