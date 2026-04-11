@@ -215,56 +215,281 @@ backend/
 
 ### Schema
 
-#### 1. **articles** - Nội dung crawl được
+#### 1. **articles** - Bài báo đã crawl
 ```sql
-- id: UUID (PK)
-- url: String (unique)
-- title: String
-- content: Text
-- source: String (vinmec, skds...)
-- crawled_at: DateTime
-- processed: Boolean
-- quality_score: Float (0-1)
+- id              : Integer (PK)
+- url             : String(2048) unique         -- URL đầy đủ trang đã crawl
+- title           : String(512)
+- source_domain   : String(255)                 -- hellobacsi.com, vinmec.com...
+- raw_html        : Text                        -- HTML gốc (~457KB/bài, tổng ~540MB)
+- clean_text      : Text                        -- Nội dung đã extract
+- char_count      : Integer
+- crawl_batch_id  : Integer
+- crawled_at      : DateTime(timezone)
+- status          : Enum(PENDING, IN_PROGRESS, COMPLETED, FAILED)
+- content_hash    : String(64)                  -- SHA256 để deduplicate
+- is_duplicate    : Boolean
+- duplicate_of_id : Integer
+- similarity_score: Float
 ```
 
-#### 2. **sentences** - Câu được segment
+#### 2. **sentences** - Câu được tách từ bài viết
 ```sql
-- id: UUID (PK)
-- article_id: UUID (FK → articles)
-- text: Text
-- position: Integer (vị trí câu trong bài)
-- created_at: DateTime
+- id              : Integer (PK)
+- article_id      : Integer (FK → articles, CASCADE DELETE)
+- raw_text        : Text                        -- Câu gốc
+- normalized_text : Text                        -- Câu sau normalize
+- char_count      : Integer
+- word_count      : Integer
+- pipeline_status : Enum(RAW, SEGMENTED, NORMALIZED, DEDUPLICATED, PROCESSED)
+- is_medical      : Boolean
+- medical_confidence: Float
+- is_duplicate    : Boolean
+- duplicate_of_id : Integer
+- created_at      : DateTime(timezone)
+- processed_at    : DateTime(timezone)
 ```
 
-#### 3. **entities** - Thực thể được trích xuất
+#### 3. **entities** - Thực thể y tế được trích xuất
 ```sql
-- id: UUID (PK)
-- sentence_id: UUID (FK → sentences)
-- text: String (từ gốc: "viêm phổi")
-- normalized_text: String (chuẩn hóa: "viêm phổi")
-- entity_type: Enum (DISEASE, DRUG, SYMPTOM...)
-- start_pos: Integer (vị trí bắt đầu trong câu)
-- end_pos: Integer (vị trí kết thúc)
-- confidence: Float (0-1)
-- source: String (phobert, dictionary, rule_based)
-- created_at: DateTime
+- id              : Integer (PK)
+- text            : String(512)                 -- Từ gốc: "viêm phổi"
+- normalized_text : String(512)
+- entity_type     : Enum(DISEASE, DRUG, SYMPTOM, TREATMENT, BODY_PART, TEST)
+- frequency       : Integer
+- avg_confidence  : Float
+- first_seen      : DateTime(timezone)
+- last_seen       : DateTime(timezone)
 ```
 
-#### 4. **knowledge_maps** - Liên kết thực thể
+#### 4. **knowledge_map** - Liên kết entity ↔ sentence
 ```sql
-- id: UUID (PK)
-- entity1_id: UUID (FK → entities)
-- entity2_id: UUID (FK → entities)
-- relation_type: String (causes, treats, diagnoses...)
-- confidence: Float
-- created_at: DateTime
+- id              : Integer (PK)
+- sentence_id     : Integer (FK → sentences, CASCADE DELETE)
+- entity_id       : Integer (FK → entities, CASCADE DELETE)
+- article_id      : Integer (FK → articles, CASCADE DELETE)
+- start_pos       : Integer
+- end_pos         : Integer
+- confidence      : Float
+- extractor       : String                      -- phobert / dictionary / rule_based
+- created_at      : DateTime(timezone)
+```
+
+#### 5. **corrections** - Annotation thủ công (Human-in-the-Loop)
+```sql
+- id              : Integer (PK)
+- ...
 ```
 
 ### Relationships
 ```
-Article (1) ──→ (N) Sentence ──→ (N) Entity
-                                      ↓
-                            (N) ←── KnowledgeMap ──→ (N)
+Article (1) ──→ (N) Sentence ──→ (N) KnowledgeMap ──→ (1) Entity
+```
+
+---
+
+### 🔍 SELECT Queries Kiểm Tra Dữ Liệu
+
+> **Lưu ý:** Tránh dùng `SELECT *` trên bảng `articles` vì cột `raw_html` rất nặng (~457KB/row).
+
+#### Kết nối PostgreSQL
+
+```bash
+# Qua Docker
+docker exec -it medical_ner_postgres psql -U medical_user -d medical_ner
+
+# Qua psql trực tiếp
+psql -h localhost -p 5432 -U medical_user -d medical_ner
+```
+
+#### Thống kê tổng quan
+
+```sql
+-- Đếm số bản ghi toàn bộ bảng
+SELECT
+  (SELECT COUNT(*) FROM articles)     AS total_articles,
+  (SELECT COUNT(*) FROM sentences)    AS total_sentences,
+  (SELECT COUNT(*) FROM entities)     AS total_entities,
+  (SELECT COUNT(*) FROM knowledge_map) AS total_knowledge_maps,
+  (SELECT COUNT(*) FROM corrections)  AS total_corrections;
+```
+
+```sql
+-- Phân bổ theo nguồn crawl
+SELECT source_domain,
+       COUNT(*)            AS article_count,
+       SUM(char_count)     AS total_chars,
+       AVG(char_count)::int AS avg_chars
+FROM articles
+GROUP BY source_domain
+ORDER BY article_count DESC;
+```
+
+```sql
+-- Kích thước raw_html (vì sao không dùng SELECT *)
+SELECT AVG(LENGTH(raw_html))::int AS avg_html_bytes,
+       MAX(LENGTH(raw_html))::int AS max_html_bytes,
+       (SUM(LENGTH(raw_html)) / 1024 / 1024)::int AS total_html_mb
+FROM articles;
+```
+
+#### Kiểm tra bảng articles
+
+```sql
+-- Xem danh sách bài viết (không lấy raw_html, clean_text)
+SELECT id, url, title, source_domain, char_count, status, crawled_at
+FROM articles
+ORDER BY id
+LIMIT 50;
+```
+
+```sql
+-- Tìm bài theo domain
+SELECT id, url, title, char_count, status
+FROM articles
+WHERE source_domain = 'hellobacsi.com'
+ORDER BY char_count DESC
+LIMIT 20;
+```
+
+```sql
+-- Kiểm tra URL đã crawl (tìm theo từ khóa)
+SELECT id, url, title, crawled_at
+FROM articles
+WHERE url ILIKE '%benh-tieu-duong%'
+   OR title ILIKE '%tiểu đường%';
+```
+
+```sql
+-- Bài chưa xử lý pipeline
+SELECT id, url, title, status
+FROM articles
+WHERE status != 'COMPLETED'
+ORDER BY crawled_at DESC;
+```
+
+```sql
+-- Kiểm tra duplicate
+SELECT id, url, is_duplicate, duplicate_of_id, similarity_score
+FROM articles
+WHERE is_duplicate = true
+LIMIT 20;
+```
+
+```sql
+-- Xem nội dung text của một bài cụ thể (thay id)
+SELECT id, url, title, clean_text
+FROM articles
+WHERE id = 1;
+```
+
+#### Kiểm tra bảng sentences
+
+```sql
+-- Số câu trung bình mỗi bài
+SELECT AVG(cnt)::int AS avg_sentences_per_article,
+       MAX(cnt)      AS max_sentences,
+       MIN(cnt)      AS min_sentences
+FROM (
+  SELECT article_id, COUNT(*) AS cnt
+  FROM sentences
+  GROUP BY article_id
+) sub;
+```
+
+```sql
+-- Top 10 bài có nhiều câu nhất
+SELECT a.id, a.url, a.title, COUNT(s.id) AS sentence_count
+FROM articles a
+JOIN sentences s ON s.article_id = a.id
+GROUP BY a.id, a.url, a.title
+ORDER BY sentence_count DESC
+LIMIT 10;
+```
+
+```sql
+-- Xem câu của một bài cụ thể (thay article_id)
+SELECT id, raw_text, normalized_text, word_count, pipeline_status, is_medical
+FROM sentences
+WHERE article_id = 636
+ORDER BY id;
+```
+
+```sql
+-- Câu chứa từ khóa y tế
+SELECT s.id, s.raw_text, s.word_count, a.url
+FROM sentences s
+JOIN articles a ON a.id = s.article_id
+WHERE s.raw_text ILIKE '%ung thư%'
+LIMIT 20;
+```
+
+```sql
+-- Phân bổ pipeline_status
+SELECT pipeline_status, COUNT(*) AS count
+FROM sentences
+GROUP BY pipeline_status;
+```
+
+#### Kiểm tra bảng entities
+
+```sql
+-- Tất cả entity types và số lượng
+SELECT entity_type, COUNT(*) AS count
+FROM entities
+GROUP BY entity_type
+ORDER BY count DESC;
+```
+
+```sql
+-- Top entity xuất hiện nhiều nhất
+SELECT text, normalized_text, entity_type, frequency, avg_confidence
+FROM entities
+ORDER BY frequency DESC
+LIMIT 20;
+```
+
+```sql
+-- Tìm entity theo loại
+SELECT text, normalized_text, frequency
+FROM entities
+WHERE entity_type = 'DISEASE'
+ORDER BY frequency DESC
+LIMIT 20;
+```
+
+#### Join nhiều bảng
+
+```sql
+-- Câu + entity của một bài viết cụ thể (thay article_id)
+SELECT
+  s.id          AS sentence_id,
+  s.raw_text,
+  e.text        AS entity_text,
+  e.entity_type,
+  km.confidence,
+  km.extractor
+FROM sentences s
+JOIN knowledge_map km ON km.sentence_id = s.id
+JOIN entities e ON e.id = km.entity_id
+WHERE s.article_id = 636
+ORDER BY s.id, km.confidence DESC;
+```
+
+```sql
+-- Toàn bộ pipeline: article → sentence → entity
+SELECT
+  a.url,
+  a.title,
+  a.source_domain,
+  COUNT(DISTINCT s.id)  AS sentences,
+  COUNT(DISTINCT km.id) AS entity_mentions
+FROM articles a
+LEFT JOIN sentences s  ON s.article_id = a.id
+LEFT JOIN knowledge_map km ON km.article_id = a.id
+GROUP BY a.id, a.url, a.title, a.source_domain
+ORDER BY entity_mentions DESC
+LIMIT 20;
 ```
 
 ---
