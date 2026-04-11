@@ -8,6 +8,19 @@ router = APIRouter()
 
 # In-memory job tracking (production: use Redis/Celery)
 crawl_jobs: dict = {}
+discovery_jobs: dict = {}
+
+
+class DiscoverRequest(BaseModel):
+    url: str
+
+
+class DiscoverStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    url_count: int
+    logs: list[str] = []
+    urls: list[str] = []
 
 
 class CrawlStartRequest(BaseModel):
@@ -69,10 +82,77 @@ async def get_crawl_status(job_id: str):
     )
 
 
+@router.post("/discover")
+async def start_discovery(
+    request: DiscoverRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Start a background site discovery job"""
+    job_id = str(uuid.uuid4())
+
+    discovery_jobs[job_id] = {
+        "status": "running",
+        "url": request.url,
+        "url_count": 0,
+        "logs": [],
+        "urls": [],
+    }
+
+    background_tasks.add_task(run_discovery_job, job_id, request.url)
+
+    return {
+        "job_id": job_id,
+        "status": "started",
+        "message": f"Discovery started for {request.url}",
+    }
+
+
+@router.get("/discover/{job_id}", response_model=DiscoverStatusResponse)
+async def get_discovery_status(job_id: str):
+    """Get status of a discovery job"""
+    from fastapi import HTTPException
+    if job_id not in discovery_jobs:
+        raise HTTPException(status_code=404, detail="Discovery job not found")
+
+    job = discovery_jobs[job_id]
+    return DiscoverStatusResponse(
+        job_id=job_id,
+        status=job["status"],
+        url_count=job.get("url_count", 0),
+        logs=job.get("logs", []),
+        urls=job.get("urls", []),
+    )
+
+
 @router.get("/history")
 async def list_crawl_history():
     """List all crawl jobs"""
     return {"jobs": list(crawl_jobs.values())}
+
+
+async def run_discovery_job(job_id: str, url: str):
+    """Background task that runs site discovery"""
+    from app.crawler.discovery import SiteDiscovery
+
+    try:
+        discovery = SiteDiscovery()
+
+        def progress_callback(count: int, found_url: str):
+            discovery_jobs[job_id]["url_count"] = count
+            discovery_jobs[job_id]["logs"].append(f"[{count}] {found_url}")
+            discovery_jobs[job_id]["urls"].append(found_url)
+
+        urls = await discovery.discover(url, on_progress=progress_callback)
+
+        discovery_jobs[job_id]["status"] = "completed"
+        discovery_jobs[job_id]["url_count"] = len(urls)
+
+    except ValueError as e:
+        discovery_jobs[job_id]["status"] = "failed"
+        discovery_jobs[job_id]["error"] = str(e)
+    except Exception as e:
+        discovery_jobs[job_id]["status"] = "failed"
+        discovery_jobs[job_id]["error"] = str(e)
 
 
 async def run_crawl_job(job_id: str, url: str, max_pages: Optional[int]):
