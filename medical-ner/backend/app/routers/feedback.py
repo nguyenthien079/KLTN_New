@@ -29,7 +29,6 @@ class CorrectionItem(BaseModel):
     original_text: str
     original_entities: List[EntityItem]
     corrected_entities: List[EntityItem]
-    status: str = "pending_review"
 
 
 class SubmitRequest(BaseModel):
@@ -85,7 +84,7 @@ async def submit_corrections(
                 original_text=item.original_text,
                 original_entities=[e.model_dump() for e in item.original_entities],
                 corrected_entities=[e.model_dump() for e in item.corrected_entities],
-                status=item.status,
+                status="pending_review",
                 labeler_id=user.id,
             )
             db.add(correction)
@@ -105,7 +104,8 @@ async def submit_corrections(
 
 @router.get("/export", response_model=List[BIOToken])
 async def export_corrections(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
 ):
     """
     Export all corrections in BIO format for training.
@@ -134,7 +134,8 @@ async def export_corrections(
 
 @router.get("/stats", response_model=StatsResponse)
 async def get_stats(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
 ):
     """Get total number of corrections in database"""
     try:

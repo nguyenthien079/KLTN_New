@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -11,7 +12,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models.user import User
 
-SECRET_KEY = "change-me-in-production-use-env-var"
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 

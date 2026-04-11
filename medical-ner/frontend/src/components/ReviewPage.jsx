@@ -12,6 +12,7 @@ export default function ReviewPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -28,13 +29,23 @@ export default function ReviewPage() {
   useEffect(() => { load(); }, []);
 
   const handleConfirm = async (id) => {
-    await confirmCorrection(id);
-    setItems((prev) => prev.map((x) => x.id === id ? { ...x, status: 'confirmed' } : x));
+    setActionError(null);
+    try {
+      await confirmCorrection(id);
+      setItems((prev) => prev.map((x) => x.id === id ? { ...x, status: 'confirmed' } : x));
+    } catch (err) {
+      setActionError(err.response?.data?.detail || 'Không thể duyệt.');
+    }
   };
 
   const handleReject = async (id) => {
-    await rejectCorrection(id);
-    setItems((prev) => prev.map((x) => x.id === id ? { ...x, status: 'rejected' } : x));
+    setActionError(null);
+    try {
+      await rejectCorrection(id);
+      setItems((prev) => prev.map((x) => x.id === id ? { ...x, status: 'rejected' } : x));
+    } catch (err) {
+      setActionError(err.response?.data?.detail || 'Không thể từ chối.');
+    }
   };
 
   if (loading) return <div className="review-loading">Đang tải...</div>;
@@ -50,6 +61,7 @@ export default function ReviewPage() {
         <span className="review-count-done">{done.length} đã xử lý</span>
         <button className="review-refresh-btn" onClick={load}>Làm mới</button>
       </div>
+      {actionError && <p className="review-error">{actionError}</p>}
 
       {items.length === 0 && (
         <div className="review-empty">Chưa có dữ liệu gán nhãn nào.</div>

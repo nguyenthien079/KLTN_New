@@ -63,17 +63,18 @@ async def run_pipeline_job(job_id: str, article_id: Optional[int]):
             pipeline = MedicalTextPipeline(db)
             pipeline_jobs[job_id]["logs"].append("Đang khởi động pipeline...")
 
-            if article_id:
+            if article_id is not None:
                 stats = await pipeline.process_article(article_id)
                 pipeline_jobs[job_id]["articles_processed"] = 1
                 pipeline_jobs[job_id]["total_sentences"] = stats["sentences_after_dedup"]
+                pipeline_jobs[job_id]["logs"].append(f"Hoàn tất: 1 bài, {stats['sentences_after_dedup']} câu")
             else:
                 stats = await pipeline.process_all_articles()
                 pipeline_jobs[job_id]["articles_processed"] = stats["articles_processed"]
                 pipeline_jobs[job_id]["total_sentences"] = stats["total_sentences"]
+                pipeline_jobs[job_id]["logs"].append(f"Hoàn tất: {stats['articles_processed']} bài, {stats['total_sentences']} câu")
 
             pipeline_jobs[job_id]["status"] = "completed"
-            pipeline_jobs[job_id]["logs"].append(f"Hoàn tất: {stats['articles_processed']} bài, {stats['total_sentences']} câu")
 
     except Exception as e:
         pipeline_jobs[job_id]["status"] = "failed"
