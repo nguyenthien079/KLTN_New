@@ -55,8 +55,11 @@ class SiteDiscovery:
                     log(link)
 
         # Step 3: BFS depth 2 on found URLs (cap at 200 to avoid runaway)
-        queue = list(found)[:200]
-        for url in queue:
+        depth1_queue = [u for u in list(found)[:200] if u not in visited]
+        depth2_urls: Set[str] = set()
+
+        # Depth 1 pass
+        for url in depth1_queue:
             if url in visited:
                 continue
             visited.add(url)
@@ -67,10 +70,29 @@ class SiteDiscovery:
             for link in self._extract_links(html, url, domain):
                 if link not in found:
                     log(link)
-                    if len(found) >= 1000:  # hard cap
-                        break
+                    depth2_urls.add(link)
+                if len(found) >= 1000:  # hard cap
+                    break
             if len(found) >= 1000:
                 break
+
+        # Depth 2 pass
+        if len(found) < 1000:
+            for url in list(depth2_urls)[:200]:
+                if url in visited:
+                    continue
+                visited.add(url)
+                await asyncio.sleep(0.1)  # polite rate limit
+                html = await self.extractor.fetch_html(url)
+                if not html:
+                    continue
+                for link in self._extract_links(html, url, domain):
+                    if link not in found:
+                        log(link)
+                    if len(found) >= 1000:  # hard cap
+                        break
+                if len(found) >= 1000:
+                    break
 
         return sorted(found)
 
