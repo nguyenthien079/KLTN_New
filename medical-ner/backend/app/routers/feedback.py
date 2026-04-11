@@ -6,6 +6,8 @@ from sqlalchemy import select, func
 
 from app.database import get_db
 from app.models.correction import Correction
+from app.auth import get_current_user, require_admin
+from app.models.user import User
 
 router = APIRouter()
 
@@ -27,6 +29,7 @@ class CorrectionItem(BaseModel):
     original_text: str
     original_entities: List[EntityItem]
     corrected_entities: List[EntityItem]
+    status: str = "pending_review"
 
 
 class SubmitRequest(BaseModel):
@@ -43,6 +46,15 @@ class SubmitResponse(BaseModel):
 class StatsResponse(BaseModel):
     """Statistics about corrections"""
     total: int
+
+
+class ReviewResponse(BaseModel):
+    id: str
+    original_text: str
+    original_entities: list
+    corrected_entities: list
+    status: str
+    labeler_id: str | None
 
 
 class BIOToken(BaseModel):
@@ -71,7 +83,9 @@ async def submit_corrections(
             correction = Correction(
                 original_text=item.original_text,
                 original_entities=[e.model_dump() for e in item.original_entities],
-                corrected_entities=[e.model_dump() for e in item.corrected_entities]
+                corrected_entities=[e.model_dump() for e in item.corrected_entities],
+                status=item.status,
+                labeler_id=None,
             )
             db.add(correction)
             saved_count += 1
@@ -130,6 +144,59 @@ async def get_stats(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy stats: {str(e)}")
+
+
+@router.get("/queue", response_model=list[ReviewResponse])
+async def get_review_queue(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Admin: list all corrections"""
+    result = await db.execute(
+        select(Correction).order_by(Correction.created_at.desc())
+    )
+    corrections = result.scalars().all()
+    return [
+        ReviewResponse(
+            id=c.id,
+            original_text=c.original_text,
+            original_entities=c.original_entities,
+            corrected_entities=c.corrected_entities,
+            status=c.status,
+            labeler_id=c.labeler_id,
+        )
+        for c in corrections
+    ]
+
+
+@router.patch("/{correction_id}/confirm")
+async def confirm_correction(
+    correction_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    result = await db.execute(select(Correction).where(Correction.id == correction_id))
+    corr = result.scalar_one_or_none()
+    if not corr:
+        raise HTTPException(status_code=404, detail="Không tìm thấy")
+    corr.status = "confirmed"
+    await db.commit()
+    return {"id": correction_id, "status": "confirmed"}
+
+
+@router.patch("/{correction_id}/reject")
+async def reject_correction(
+    correction_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    result = await db.execute(select(Correction).where(Correction.id == correction_id))
+    corr = result.scalar_one_or_none()
+    if not corr:
+        raise HTTPException(status_code=404, detail="Không tìm thấy")
+    corr.status = "rejected"
+    await db.commit()
+    return {"id": correction_id, "status": "rejected"}
 
 
 # --- Helper Functions ---
