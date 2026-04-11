@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter()
 
@@ -12,14 +12,14 @@ crawl_jobs: dict = {}
 
 class CrawlStartRequest(BaseModel):
     url: str
-    max_pages: Optional[int] = 100
+    max_pages: Optional[int] = Field(default=100, ge=1, le=500)
 
 
 class CrawlStatusResponse(BaseModel):
     job_id: str
     status: str
     progress: dict
-    logs: list = []
+    logs: list[str] = []
 
 
 @router.post("/start")
@@ -98,7 +98,6 @@ async def run_crawl_job(job_id: str, url: str, max_pages: int):
             )
 
             crawl_jobs[job_id]["status"] = "completed"
-            crawl_jobs[job_id]["pages_crawled"] = len(articles)
 
     except Exception as e:
         crawl_jobs[job_id]["status"] = "failed"

@@ -1,5 +1,5 @@
 import asyncio
-from typing import List, Dict, Set
+from typing import Callable, Dict, List, Optional, Set
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 from sqlalchemy import select
@@ -25,7 +25,7 @@ class MedicalCrawler:
         self,
         start_url: str,
         max_pages: int = 100,
-        on_progress=None
+        on_progress: Optional[Callable[[int, str, str], None]] = None
     ) -> List[Article]:
         """Crawl a medical website starting from start_url"""
         domain = urlparse(start_url).netloc
