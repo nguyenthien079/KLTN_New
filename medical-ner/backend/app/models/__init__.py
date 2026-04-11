@@ -4,6 +4,7 @@ from app.models.sentence import Sentence, PipelineStatus
 from app.models.entity import Entity, EntityType
 from app.models.knowledge_map import KnowledgeMap
 from app.models.correction import Correction
+from app.models.user import User
 
 __all__ = [
     "Base",
@@ -15,4 +16,5 @@ __all__ = [
     "CrawlStatus",
     "PipelineStatus",
     "EntityType",
+    "User",
 ]
