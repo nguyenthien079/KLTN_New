@@ -24,7 +24,8 @@ class MedicalCrawler:
     async def crawl_site(
         self,
         start_url: str,
-        max_pages: int = 100
+        max_pages: int = 100,
+        on_progress=None
     ) -> List[Article]:
         """Crawl a medical website starting from start_url"""
         domain = urlparse(start_url).netloc
@@ -67,6 +68,8 @@ class MedicalCrawler:
             }
 
             crawled.append(article_data)
+            if on_progress:
+                on_progress(len(crawled), url, extracted.get("title", ""))
             print(f"  [{len(crawled):>3}/{max_pages}] OK ({extracted['char_count']:>6} chars) | {extracted['title'][:60] or url}")
 
             # Find more links (same domain only)

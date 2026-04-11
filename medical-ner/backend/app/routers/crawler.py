@@ -19,6 +19,7 @@ class CrawlStatusResponse(BaseModel):
     job_id: str
     status: str
     progress: dict
+    logs: list = []
 
 
 @router.post("/start")
@@ -33,7 +34,8 @@ async def start_crawl(
         "status": "running",
         "url": request.url,
         "pages_crawled": 0,
-        "max_pages": request.max_pages
+        "max_pages": request.max_pages,
+        "logs": []
     }
 
     background_tasks.add_task(
@@ -64,7 +66,8 @@ async def get_crawl_status(job_id: str):
         progress={
             "pages_crawled": job.get("pages_crawled", 0),
             "max_pages": job.get("max_pages", 0)
-        }
+        },
+        logs=job.get("logs", [])
     )
 
 
@@ -82,7 +85,17 @@ async def run_crawl_job(job_id: str, url: str, max_pages: int):
     try:
         async with AsyncSessionLocal() as db:
             crawler = MedicalCrawler(db)
-            articles = await crawler.crawl_site(url, max_pages=max_pages)
+
+            def progress_callback(count: int, page_url: str, title: str):
+                crawl_jobs[job_id]["pages_crawled"] = count
+                label = title.strip()[:70] if title.strip() else page_url
+                crawl_jobs[job_id]["logs"].append(
+                    f"[{count}/{max_pages}] {label}"
+                )
+
+            articles = await crawler.crawl_site(
+                url, max_pages=max_pages, on_progress=progress_callback
+            )
 
             crawl_jobs[job_id]["status"] = "completed"
             crawl_jobs[job_id]["pages_crawled"] = len(articles)
