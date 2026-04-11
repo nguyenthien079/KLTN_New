@@ -1,0 +1,235 @@
+.discover-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.discover-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.discover-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.discover-url-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.discover-url-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.discover-btn {
+  padding: 10px 22px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.discover-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.discover-error {
+  margin-top: 10px;
+  color: var(--color-error, #dc2626);
+  font-size: 0.88rem;
+}
+
+.discover-monitor {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.discover-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.discover-badge {
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+
+.discover-badge--running   { background: #fef3c7; color: #92400e; }
+.discover-badge--completed { background: #d1fae5; color: #065f46; }
+.discover-badge--failed    { background: var(--color-error-bg); color: var(--color-error); }
+
+.discover-count {
+  font-size: 0.88rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.discover-progress-bar {
+  height: 8px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.discover-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 4px;
+}
+
+@keyframes discover-slide {
+  0%   { transform: translateX(-100%); width: 40%; }
+  100% { transform: translateX(300%);  width: 40%; }
+}
+
+.discover-progress-fill--indeterminate {
+  width: 40%;
+  animation: discover-slide 1.4s ease-in-out infinite;
+}
+
+.discover-progress-fill--done {
+  width: 100%;
+}
+
+.discover-log {
+  background: #0f172a;
+  color: #94a3b8;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  border-radius: 6px;
+  padding: 14px 16px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.discover-log-placeholder { color: #475569; font-style: italic; }
+.discover-log-line { white-space: pre-wrap; word-break: break-all; }
+.discover-log-done  { color: #4ade80; margin-top: 6px; }
+.discover-log-error { color: #f87171; margin-top: 6px; }
+
+.discover-results {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.discover-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.discover-check-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.discover-export-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.discover-export-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.discover-export-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.discover-url-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.discover-url-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.discover-url-item:hover .discover-url-text {
+  color: var(--color-primary);
+}
+
+.discover-url-text {
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+.discover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.discover-crawl-msg {
+  font-size: 0.88rem;
+  color: var(--color-primary);
+}
+
+.discover-crawl-btn {
+  padding: 10px 24px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discover-crawl-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
