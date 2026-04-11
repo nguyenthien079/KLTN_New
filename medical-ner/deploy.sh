@@ -14,8 +14,8 @@ if [[ -z "$PEM_KEY" || -z "$SERVER" ]]; then
   exit 1
 fi
 
-SSH="ssh -i $PEM_KEY -o StrictHostKeyChecking=no $SERVER"
-SCP="scp -i $PEM_KEY -o StrictHostKeyChecking=no"
+SSH="ssh -i \"$PEM_KEY\" -o StrictHostKeyChecking=accept-new \"$SERVER\""
+SCP="scp -i \"$PEM_KEY\" -o StrictHostKeyChecking=accept-new"
 
 echo "=== [1/4] Uploading project files ==="
 rsync -az --delete \
@@ -23,7 +23,7 @@ rsync -az --delete \
   --exclude '__pycache__' \
   --exclude '.git' \
   --exclude 'backend/data/*.db' \
-  -e "ssh -i $PEM_KEY -o StrictHostKeyChecking=no" \
+  -e "ssh -i \"$PEM_KEY\" -o StrictHostKeyChecking=accept-new" \
   ./ "$SERVER:$REMOTE_DIR/"
 
 echo "=== [2/4] Setting up server dependencies ==="
@@ -34,7 +34,7 @@ $SSH "
     sudo usermod -aG docker \$USER
     echo 'Docker installed.'
   fi
-  if ! command -v docker compose &>/dev/null; then
+  if ! docker compose version &>/dev/null; then
     sudo apt-get install -y docker-compose-plugin
   fi
 "
@@ -42,9 +42,9 @@ $SSH "
 echo "=== [3/4] Building and starting containers ==="
 $SSH "
   cd $REMOTE_DIR
-  docker compose down --remove-orphans || true
-  docker compose build --no-cache
-  docker compose up -d
+  sudo docker compose down --remove-orphans || true
+  sudo docker compose build --no-cache
+  sudo docker compose up -d
 "
 
 echo "=== [4/4] Health check ==="
