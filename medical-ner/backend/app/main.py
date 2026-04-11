@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import engine, Base
-from app.routers import crawler, pipeline, ner, admin, feedback, auth
+from app.routers import crawler, pipeline, ner, admin, feedback, auth, users
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.include_router(ner.router, prefix="/api/ner", tags=["NER"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
 
 
 @app.get("/api/health")
