@@ -11,12 +11,23 @@ class HTMLExtractor:
 
     async def fetch_html(self, url: str, timeout: int = 30) -> Optional[str]:
         """Fetch HTML from URL"""
+        # Full browser-like headers to avoid 406 errors
+        headers = {
+            "User-Agent": config.user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1"
+        }
+        
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(
-                    url,
+                    url.strip(),  # Remove any trailing spaces
                     timeout=timeout,
-                    headers={"User-Agent": config.user_agent},
+                    headers=headers,
                     follow_redirects=True
                 )
                 response.raise_for_status()
