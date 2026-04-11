@@ -4,6 +4,7 @@ from typing import Callable, List, Optional, Set
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
+from app.crawler.config import config
 from app.crawler.extractor import HTMLExtractor
 
 
@@ -27,6 +28,8 @@ class SiteDiscovery:
         Returns sorted list of unique URLs.
         """
         parsed = urlparse(start_url)
+        if not parsed.netloc or parsed.scheme not in ('http', 'https'):
+            raise ValueError(f"Invalid URL: {start_url!r}. Must be an http/https URL with a domain.")
         domain = parsed.netloc
         base_url = f"{parsed.scheme}://{parsed.netloc}"
 
@@ -45,6 +48,7 @@ class SiteDiscovery:
                 if link not in found:
                     log(link)
         visited.add(start_url)
+        log(start_url)
 
         # Step 2: sitemap.xml
         sitemap_url = f"{base_url}/sitemap.xml"
@@ -54,16 +58,16 @@ class SiteDiscovery:
                 if link not in found:
                     log(link)
 
-        # Step 3: BFS depth 2 on found URLs (cap at 200 to avoid runaway)
-        depth1_queue = [u for u in list(found)[:200] if u not in visited]
+        # Step 3: BFS depth 2
+        # Depth 1: crawl all URLs found so far (from homepage + sitemap)
+        depth1_queue = sorted(found - visited)[:200]
         depth2_urls: Set[str] = set()
 
-        # Depth 1 pass
         for url in depth1_queue:
             if url in visited:
                 continue
             visited.add(url)
-            await asyncio.sleep(0.1)  # polite rate limit
+            await asyncio.sleep(config.request_delay)
             html = await self.extractor.fetch_html(url)
             if not html:
                 continue
@@ -71,25 +75,25 @@ class SiteDiscovery:
                 if link not in found:
                     log(link)
                     depth2_urls.add(link)
-                if len(found) >= 1000:  # hard cap
+                if len(found) >= 1000:
                     break
             if len(found) >= 1000:
                 break
 
-        # Depth 2 pass
+        # Depth 2: crawl URLs discovered during depth 1
         if len(found) < 1000:
-            for url in list(depth2_urls)[:200]:
+            for url in sorted(depth2_urls - visited)[:200]:
                 if url in visited:
                     continue
                 visited.add(url)
-                await asyncio.sleep(0.1)  # polite rate limit
+                await asyncio.sleep(config.request_delay)
                 html = await self.extractor.fetch_html(url)
                 if not html:
                     continue
                 for link in self._extract_links(html, url, domain):
                     if link not in found:
                         log(link)
-                    if len(found) >= 1000:  # hard cap
+                    if len(found) >= 1000:
                         break
                 if len(found) >= 1000:
                     break
