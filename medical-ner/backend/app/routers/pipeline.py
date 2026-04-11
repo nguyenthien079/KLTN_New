@@ -10,6 +10,7 @@ from app.database import get_db
 router = APIRouter()
 
 pipeline_jobs: dict = {}
+filter_jobs: dict = {}
 
 
 class ProcessRequest(BaseModel):
@@ -29,7 +30,8 @@ async def process_articles(
         "status": "running",
         "article_id": request.article_id,
         "articles_processed": 0,
-        "total_sentences": 0
+        "total_sentences": 0,
+        "logs": []
     }
 
     background_tasks.add_task(run_pipeline_job, job_id, request.article_id)
@@ -56,6 +58,7 @@ async def run_pipeline_job(job_id: str, article_id: Optional[int]):
     try:
         async with AsyncSessionLocal() as db:
             pipeline = MedicalTextPipeline(db)
+            pipeline_jobs[job_id]["logs"].append("Đang khởi động pipeline...")
 
             if article_id:
                 stats = await pipeline.process_article(article_id)
@@ -67,7 +70,70 @@ async def run_pipeline_job(job_id: str, article_id: Optional[int]):
                 pipeline_jobs[job_id]["total_sentences"] = stats["total_sentences"]
 
             pipeline_jobs[job_id]["status"] = "completed"
+            pipeline_jobs[job_id]["logs"].append(f"Hoàn tất: {stats['articles_processed']} bài, {stats['total_sentences']} câu")
 
     except Exception as e:
         pipeline_jobs[job_id]["status"] = "failed"
         pipeline_jobs[job_id]["error"] = str(e)
+        pipeline_jobs[job_id]["logs"].append(f"Lỗi: {str(e)}")
+
+
+@router.post("/filter")
+async def start_filter(background_tasks: BackgroundTasks):
+    """Run filter_quality as background job"""
+    job_id = str(uuid.uuid4())
+    filter_jobs[job_id] = {"status": "running", "logs": [], "result": {}}
+    background_tasks.add_task(run_filter_job, job_id)
+    return {"job_id": job_id, "status": "started"}
+
+
+@router.get("/filter/{job_id}")
+async def get_filter_status(job_id: str):
+    from fastapi import HTTPException
+    if job_id not in filter_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return filter_jobs[job_id]
+
+
+async def run_filter_job(job_id: str):
+    from app.database import AsyncSessionLocal
+    from sqlalchemy import select
+    from app.models import Article
+
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Article))
+            articles = result.scalars().all()
+            total = len(articles)
+            filter_jobs[job_id]["logs"].append(f"Tổng bài: {total}")
+
+            removed = 0
+            for article in articles:
+                reason = None
+                if not article.clean_text:
+                    reason = "no text"
+                elif len(article.clean_text) < 200:
+                    reason = f"quá ngắn ({len(article.clean_text)} ký tự)"
+                elif len(article.clean_text) > 50000:
+                    reason = f"quá dài ({len(article.clean_text)} ký tự)"
+                elif article.clean_text.count(' ') < 20:
+                    reason = "quá ít từ"
+
+                if reason:
+                    await db.delete(article)
+                    removed += 1
+                    filter_jobs[job_id]["logs"].append(
+                        f"[xóa] {(article.title or article.url or '')[:60]} — {reason}"
+                    )
+
+            await db.commit()
+            remaining = total - removed
+            filter_jobs[job_id]["logs"].append(
+                f"Hoàn tất: xóa {removed}, còn lại {remaining} bài"
+            )
+            filter_jobs[job_id]["status"] = "completed"
+            filter_jobs[job_id]["result"] = {"removed": removed, "remaining": remaining}
+
+    except Exception as e:
+        filter_jobs[job_id]["status"] = "failed"
+        filter_jobs[job_id]["logs"].append(f"Lỗi: {str(e)}")
