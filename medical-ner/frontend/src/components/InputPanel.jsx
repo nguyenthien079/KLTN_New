@@ -24,6 +24,12 @@ const InputPanel = ({ inputType, inputValue, loading, error, onTypeChange, onVal
       </button>
     </div>
 
+    <p className="input-note">
+      {inputType === 'text'
+        ? 'Lưu ý: chỉ dán văn bản thuần, không dán URL vào đây.'
+        : 'Lưu ý: chỉ nhập URL bài báo, không dán văn bản vào đây.'}
+    </p>
+
     {inputType === 'text' ? (
       <textarea
         className="input-field input-textarea"

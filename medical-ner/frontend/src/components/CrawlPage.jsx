@@ -81,9 +81,15 @@ export default function CrawlPage() {
         </button>
       </div>
 
-      {subTab === 'discover' && <DiscoverPage />}
+      {subTab === 'discover' && (
+        <>
+          <p className="crawl-tab-note">Tìm site chỉ quét và liệt kê URL — không crawl nội dung bài viết.</p>
+          <DiscoverPage />
+        </>
+      )}
 
       {subTab === 'crawl' && <div className="crawl-form">
+        <p className="crawl-tab-note">Crawl trực tiếp nội dung bài viết từ URL — không tìm kiếm thêm site.</p>
         <div className="crawl-input-row">
           <input
             className="crawl-url-input"

@@ -91,6 +91,16 @@
   color: var(--color-text);
 }
 
+.input-note {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+  padding: 5px 10px;
+  background: var(--color-bg);
+  border-left: 3px solid var(--color-border-strong, #cbd5e1);
+  border-radius: 2px;
+}
+
 .input-field {
   width: 100%;
   border: 1px solid var(--color-border);
