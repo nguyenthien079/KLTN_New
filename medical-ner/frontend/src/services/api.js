@@ -133,4 +133,58 @@ export const getMe = async () => {
   return response.data;
 };
 
+// Labeling
+export const getLabelingArticles = async () => {
+  const response = await api.get('/api/labeling/articles');
+  return response.data;
+};
+
+export const getLabelingArticle = async (articleId) => {
+  const response = await api.get(`/api/labeling/articles/${articleId}`);
+  return response.data;
+};
+
+export const getArticleSubmissions = async (articleId) => {
+  const response = await api.get(`/api/labeling/articles/${articleId}/submissions`);
+  return response.data;
+};
+
+export const saveSubmission = async (articleId, annotations, submit = false) => {
+  const response = await api.post(`/api/labeling/articles/${articleId}/save`, {
+    annotations,
+    submit,
+  });
+  return response.data;
+};
+
+export const assignArticle = async (articleId, labelerId, blindMode = false) => {
+  const response = await api.post('/api/labeling/assign', {
+    article_id: articleId,
+    labeler_id: labelerId,
+    blind_mode: blindMode,
+  });
+  return response.data;
+};
+
+// Role requests
+export const requestRoleUpgrade = async () => {
+  const response = await api.post('/api/role-requests/request');
+  return response.data;
+};
+
+export const getRoleRequests = async () => {
+  const response = await api.get('/api/role-requests');
+  return response.data;
+};
+
+export const approveRoleRequest = async (requestId) => {
+  const response = await api.patch(`/api/role-requests/${requestId}/approve`);
+  return response.data;
+};
+
+export const rejectRoleRequest = async (requestId) => {
+  const response = await api.patch(`/api/role-requests/${requestId}/reject`);
+  return response.data;
+};
+
 export default api;
