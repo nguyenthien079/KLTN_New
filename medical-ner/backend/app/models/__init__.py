@@ -6,6 +6,9 @@ from app.models.knowledge_map import KnowledgeMap
 from app.models.correction import Correction
 from app.models.user import User
 from app.models.role_request import RoleRequest
+from app.models.label_assignment import LabelAssignment
+from app.models.label_submission import LabelSubmission
+from app.models.label_annotation import LabelAnnotation
 
 __all__ = [
     "Base",
@@ -19,4 +22,7 @@ __all__ = [
     "EntityType",
     "User",
     "RoleRequest",
+    "LabelAssignment",
+    "LabelSubmission",
+    "LabelAnnotation",
 ]
