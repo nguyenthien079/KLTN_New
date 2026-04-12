@@ -5,6 +5,7 @@ from app.models.entity import Entity, EntityType
 from app.models.knowledge_map import KnowledgeMap
 from app.models.correction import Correction
 from app.models.user import User
+from app.models.role_request import RoleRequest
 
 __all__ = [
     "Base",
@@ -17,4 +18,5 @@ __all__ = [
     "PipelineStatus",
     "EntityType",
     "User",
+    "RoleRequest",
 ]
