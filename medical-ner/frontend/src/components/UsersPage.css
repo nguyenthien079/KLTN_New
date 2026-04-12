@@ -107,3 +107,55 @@
 }
 
 .users-create-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.users-requests-wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.users-request-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.users-request-row:last-child { border-bottom: none; }
+
+.users-request-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.users-request-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.users-request-username {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-family: 'Fira Code', monospace;
+}
+
+.users-request-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.users-request-btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.users-request-btn--approve { background: #d1fae5; color: #065f46; }
+.users-request-btn--reject  { background: #fee2e2; color: #991b1b; }

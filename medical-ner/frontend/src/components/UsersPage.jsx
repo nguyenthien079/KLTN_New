@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUsers, createUser } from '../services/api';
+import { getUsers, createUser, getRoleRequests, approveRoleRequest, rejectRoleRequest } from '../services/api';
 import './UsersPage.css';
 
 const ROLE_LABEL = { admin: 'Admin', chuyen_gia: 'Chuyên gia', labeler: 'Labeler' };
@@ -11,6 +11,9 @@ export default function UsersPage() {
   const [form, setForm] = useState({ username: '', password: '', display_name: '', role: 'labeler' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
+  const [roleRequests, setRoleRequests] = useState([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [requestsError, setRequestsError] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -23,7 +26,39 @@ export default function UsersPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    loadRequests();
+  }, []);
+
+  const loadRequests = async () => {
+    setRequestsLoading(true);
+    try {
+      setRoleRequests(await getRoleRequests());
+    } catch {
+      setRequestsError('Không thể tải yêu cầu.');
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  const handleApprove = async (requestId) => {
+    try {
+      await approveRoleRequest(requestId);
+      setRoleRequests((prev) => prev.filter((r) => r.id !== requestId));
+    } catch (err) {
+      setRequestsError(err.response?.data?.detail || 'Lỗi duyệt.');
+    }
+  };
+
+  const handleReject = async (requestId) => {
+    try {
+      await rejectRoleRequest(requestId);
+      setRoleRequests((prev) => prev.filter((r) => r.id !== requestId));
+    } catch (err) {
+      setRequestsError(err.response?.data?.detail || 'Lỗi từ chối.');
+    }
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -111,6 +146,37 @@ export default function UsersPage() {
             {creating ? 'Đang tạo...' : 'Tạo'}
           </button>
         </form>
+      </div>
+
+      <div className="users-requests-wrap">
+        <h3 className="users-create-title">Yêu cầu nâng quyền</h3>
+        {requestsLoading && <p className="users-loading">Đang tải...</p>}
+        {requestsError && <p className="users-error">{requestsError}</p>}
+        {!requestsLoading && roleRequests.length === 0 && (
+          <p className="users-loading">Không có yêu cầu nào.</p>
+        )}
+        {roleRequests.map((req) => (
+          <div key={req.id} className="users-request-row">
+            <div className="users-request-info">
+              <span className="users-request-name">{req.display_name || req.username}</span>
+              <span className="users-request-username">@{req.username}</span>
+            </div>
+            <div className="users-request-actions">
+              <button
+                className="users-request-btn users-request-btn--approve"
+                onClick={() => handleApprove(req.id)}
+              >
+                Duyệt
+              </button>
+              <button
+                className="users-request-btn users-request-btn--reject"
+                onClick={() => handleReject(req.id)}
+              >
+                Từ chối
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -725,3 +725,23 @@
   color: var(--color-error, #dc2626);
   border-color: #fca5a5;
 }
+
+.tab-nav-upgrade-btn {
+  padding: 5px 14px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #92400e;
+}
+
+.tab-nav-upgrade-btn:hover {
+  background: #fde68a;
+}
+
+.tab-nav-upgrade-msg {
+  font-size: 0.82rem;
+  color: #16a34a;
+}

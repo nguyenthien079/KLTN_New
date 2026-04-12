@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { analyzeText, analyzeUrl } from './services/api';
+import { analyzeText, analyzeUrl, requestRoleUpgrade } from './services/api';
 import { useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import InputPanel from './components/InputPanel';
@@ -23,6 +23,18 @@ function App() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('ner');
+  const [upgradeMsg, setUpgradeMsg] = useState(null);
+
+  const handleRequestUpgrade = async () => {
+    try {
+      await requestRoleUpgrade();
+      setUpgradeMsg('Đã gửi yêu cầu!');
+      setTimeout(() => setUpgradeMsg(null), 3000);
+    } catch (err) {
+      setUpgradeMsg(err.response?.data?.detail || 'Lỗi gửi yêu cầu.');
+      setTimeout(() => setUpgradeMsg(null), 3000);
+    }
+  };
 
   if (!user) return <LoginPage />;
 
@@ -99,6 +111,14 @@ function App() {
             </button>
           ))}
           <div className="tab-nav-user">
+            {user.role === 'labeler' && (
+              <>
+                {upgradeMsg && <span className="tab-nav-upgrade-msg">{upgradeMsg}</span>}
+                <button className="tab-nav-upgrade-btn" onClick={handleRequestUpgrade}>
+                  Xin Cấp Quyền
+                </button>
+              </>
+            )}
             <span className="tab-nav-username">
               {user.display_name || user.username}
             </span>
