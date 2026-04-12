@@ -11,6 +11,7 @@ import PipelinePage from './components/PipelinePage';
 import ReviewPage from './components/ReviewPage';
 import UsersPage from './components/UsersPage';
 import LoginPage from './components/LoginPage';
+import LabelingPage from './components/LabelingPage';
 import './App.css';
 
 function App() {
@@ -25,14 +26,17 @@ function App() {
 
   if (!user) return <LoginPage />;
 
+  const canSeePipeline = user.role === 'admin' || user.role === 'chuyen_gia';
+  const canSeeReview = user.role === 'admin' || user.role === 'chuyen_gia';
+  const canSeeUsers = user.role === 'admin';
+
   const tabs = [
     { id: 'ner', label: 'Phân tích NER' },
     { id: 'crawl', label: 'Thu thập dữ liệu' },
-    { id: 'pipeline', label: 'Pipeline' },
-    ...(user.role === 'admin' ? [
-      { id: 'review', label: 'Duyệt nhãn' },
-      { id: 'users', label: 'Người dùng' },
-    ] : []),
+    ...(canSeePipeline ? [{ id: 'pipeline', label: 'Pipeline' }] : []),
+    { id: 'labeling', label: 'Labeling' },
+    ...(canSeeReview ? [{ id: 'review', label: 'Duyệt nhãn' }] : []),
+    ...(canSeeUsers ? [{ id: 'users', label: 'Người dùng' }] : []),
   ];
 
   const handleTypeChange = (type) => {
@@ -127,6 +131,7 @@ function App() {
         )}
         {tab === 'crawl' && <CrawlPage />}
         {tab === 'pipeline' && <PipelinePage />}
+        {tab === 'labeling' && <LabelingPage />}
         {tab === 'review' && <ReviewPage />}
         {tab === 'users' && <UsersPage />}
       </div>

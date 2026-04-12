@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getUsers, createUser } from '../services/api';
 import './UsersPage.css';
 
-const ROLE_LABEL = { admin: 'Admin', labeler: 'Labeler' };
+const ROLE_LABEL = { admin: 'Admin', chuyen_gia: 'Chuyên gia', labeler: 'Labeler' };
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
@@ -103,6 +103,7 @@ export default function UsersPage() {
             onChange={(e) => setForm({ ...form, role: e.target.value })}
           >
             <option value="labeler">Labeler</option>
+            <option value="chuyen_gia">Chuyên gia</option>
             <option value="admin">Admin</option>
           </select>
           {createError && <p className="users-error">{createError}</p>}

@@ -52,6 +52,7 @@
 
 .users-role-badge--admin   { background: #ede9fe; color: #5b21b6; }
 .users-role-badge--labeler { background: #e0f2fe; color: #0369a1; }
+.users-role-badge--chuyen_gia { background: #fef3c7; color: #92400e; }
 
 .users-loading, .users-error {
   padding: 16px;

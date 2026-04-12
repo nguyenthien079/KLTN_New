@@ -52,8 +52,8 @@ async def create_user(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Tên đăng nhập đã tồn tại")
 
-    if request.role not in ("admin", "labeler"):
-        raise HTTPException(status_code=400, detail="Role phải là admin hoặc labeler")
+    if request.role not in ("admin", "labeler", "chuyen_gia"):
+        raise HTTPException(status_code=400, detail="Role phải là admin, chuyen_gia hoặc labeler")
 
     user = User(
         username=request.username,
