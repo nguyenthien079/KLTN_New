@@ -2,7 +2,6 @@
 import asyncio, sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import text
 from app.database import engine, Base
 from app.models import Article, Sentence, Entity, KnowledgeMap, Correction, User  # noqa
 from app.models.role_request import RoleRequest  # noqa
