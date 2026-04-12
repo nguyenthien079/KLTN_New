@@ -131,6 +131,7 @@ export default function AnnotationView({ articleId, onBack }) {
   const [popup, setPopup] = useState(null); // {x, y, start, end, text}
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
+  const [fetchError, setFetchError] = useState(null);
   const textRef = useRef(null);
 
   useEffect(() => {
@@ -143,6 +144,8 @@ export default function AnnotationView({ articleId, onBack }) {
       // load own draft annotations
       const mine = subs.find((s) => s.labeler_id === user.user_id);
       if (mine) setMyAnnotations(mine.annotations);
+    }).catch(() => {
+      setFetchError('Không thể tải bài viết.');
     });
   }, [articleId, user.user_id]);
 
@@ -152,7 +155,8 @@ export default function AnnotationView({ articleId, onBack }) {
     if (!textRef.current?.contains(sel.anchorNode)) return;
 
     const range = sel.getRangeAt(0);
-    const text = sel.toString().trim();
+    const rawText = range.toString();
+    const text = rawText.trim();
     if (!text) return;
 
     // Calculate char offsets relative to clean_text
@@ -160,10 +164,10 @@ export default function AnnotationView({ articleId, onBack }) {
     beforeRange.setStart(textRef.current, 0);
     beforeRange.setEnd(range.startContainer, range.startOffset);
     const start = beforeRange.toString().length;
-    const end = start + text.length;
+    const end = start + rawText.length;  // use raw (untrimmed) length
 
     const rect = range.getBoundingClientRect();
-    setPopup({ x: rect.left + window.scrollX, y: rect.bottom + window.scrollY + 8, start, end, text });
+    setPopup({ x: rect.left, y: rect.bottom + 8, start, end, text });
     sel.removeAllRanges();
   }, []);
 
@@ -198,12 +202,14 @@ export default function AnnotationView({ articleId, onBack }) {
       }
     } catch {
       setSaveMsg('Lỗi lưu.');
+      setTimeout(() => setSaveMsg(null), 2000);
     } finally {
       setSaving(false);
     }
   };
 
   if (!article) return <div className="av-loading">Đang tải...</div>;
+  if (fetchError) return <div className="av-loading">{fetchError}</div>;
 
   const othersAnnotations = submissions
     .filter((s) => s.labeler_id !== user.user_id)
