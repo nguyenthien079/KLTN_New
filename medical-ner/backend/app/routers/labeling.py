@@ -2,7 +2,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sa_delete
+from sqlalchemy.orm import selectinload
 from typing import Optional
 
 from app.database import get_db
@@ -35,6 +36,10 @@ class AssignRequest(BaseModel):
     article_id: int
     labeler_id: str
     blind_mode: bool = False
+
+
+class BlindModeRequest(BaseModel):
+    blind_mode: bool
 
 
 class ArticleDetail(BaseModel):
@@ -158,27 +163,25 @@ async def get_article_submissions(
     subs_result = await db.execute(
         select(LabelSubmission)
         .where(LabelSubmission.article_id == article_id)
+        .options(selectinload(LabelSubmission.annotations))
     )
     subs = subs_result.scalars().all()
 
+    # batch-load user display names
+    labeler_ids = {s.labeler_id for s in subs}
+    users_result = await db.execute(select(User).where(User.id.in_(labeler_ids)))
+    users_map = {u.id: u for u in users_result.scalars().all()}
+
     out = []
     for sub in subs:
-        # blind mode: labeler only sees own submission
         if blind and sub.labeler_id != user.id:
             continue
 
-        ann_result = await db.execute(
-            select(LabelAnnotation).where(LabelAnnotation.submission_id == sub.id)
-        )
-        annotations = ann_result.scalars().all()
-
-        # get labeler display name
-        labeler = await db.get(User, sub.labeler_id)
-
+        labeler = users_map.get(sub.labeler_id)
         out.append(SubmissionOut(
             submission_id=sub.id,
             labeler_id=sub.labeler_id,
-            labeler_name=labeler.display_name or labeler.username if labeler else sub.labeler_id[:8],
+            labeler_name=(labeler.display_name or labeler.username) if labeler else sub.labeler_id[:8],
             status=sub.status,
             annotations=[
                 AnnotationOut(
@@ -189,7 +192,7 @@ async def get_article_submissions(
                     surface_text=ann.surface_text,
                     comment=ann.comment,
                 )
-                for ann in annotations
+                for ann in sub.annotations
             ],
         ))
     return out
@@ -221,12 +224,9 @@ async def save_submission(
         # Allow re-opening draft after submit
         sub.status = "draft"
 
-    # Delete old annotations and replace
-    old = await db.execute(
-        select(LabelAnnotation).where(LabelAnnotation.submission_id == sub.id)
+    await db.execute(
+        sa_delete(LabelAnnotation).where(LabelAnnotation.submission_id == sub.id)
     )
-    for ann in old.scalars().all():
-        await db.delete(ann)
 
     for ann_in in request.annotations:
         ann = LabelAnnotation(
@@ -281,7 +281,7 @@ async def assign_article(
 @router.patch("/assignments/{assignment_id}/blind-mode")
 async def toggle_blind_mode(
     assignment_id: str,
-    blind_mode: bool,
+    body: BlindModeRequest,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_expert_or_admin),
 ):
@@ -289,6 +289,6 @@ async def toggle_blind_mode(
     a = await db.get(LabelAssignment, assignment_id)
     if not a:
         raise HTTPException(status_code=404, detail="Assignment không tồn tại")
-    a.blind_mode = blind_mode
+    a.blind_mode = body.blind_mode
     await db.commit()
-    return {"assignment_id": assignment_id, "blind_mode": blind_mode}
+    return {"assignment_id": assignment_id, "blind_mode": body.blind_mode}
