@@ -14,7 +14,7 @@ class LabelSubmission(Base):
     labeler_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     status = Column(String(20), nullable=False, default="draft")  # draft | submitted
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     annotations = relationship("LabelAnnotation", back_populates="submission",
                                 cascade="all, delete-orphan")
