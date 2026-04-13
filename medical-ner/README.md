@@ -1218,8 +1218,21 @@ pip install -r requirements.txt
 cp ../.env.example .env
 # Edit .env: set DATABASE_URL, SECRET_KEY
 
-# Run migrations
+# Run base migrations (articles, sentences, entities, knowledge_map, corrections)
 alembic upgrade head
+
+# [NEW] Migrate: tạo bảng users + thêm cột auth vào corrections
+python scripts/migrate_add_auth_columns.py
+
+# [NEW] Migrate: tạo các bảng cho hệ thống labeling & phân quyền
+#   - role_requests
+#   - label_assignments
+#   - label_submissions
+#   - label_annotations
+python scripts/migrate_labeling_tables.py
+
+# [NEW] Seed tài khoản admin mặc định (admin / admin123)
+python scripts/seed_admin.py
 
 # Download PhoBERT model (optional)
 # Place in: models/phobert-medical/final_model/
@@ -1227,6 +1240,18 @@ alembic upgrade head
 # Run server
 uvicorn app.main:app --reload --port 8000
 ```
+
+> **Lưu ý thứ tự:** Phải chạy `migrate_add_auth_columns.py` trước `migrate_labeling_tables.py` vì bảng `users` cần tồn tại trước.
+
+### Roles trong hệ thống
+
+| Role | Quyền |
+|------|-------|
+| `admin` | Toàn quyền: quản lý user, assign bài, xem tất cả submission, export |
+| `chuyen_gia` | Assign bài, xem tất cả submission, hoàn thành review + export CSV/JSON |
+| `labeler` | Gán nhãn các bài được assign, nộp submission |
+
+Sau khi seed admin, đăng nhập bằng `admin / admin123` và tạo thêm tài khoản labeler/chuyên gia qua trang Users.
 
 ### Frontend Setup
 
