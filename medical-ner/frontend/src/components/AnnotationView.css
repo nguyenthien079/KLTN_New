@@ -97,6 +97,7 @@
 .av-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .av-btn--draft { background: var(--color-surface); border: 1px solid var(--color-border-strong, #cbd5e1); color: var(--color-text-muted); }
 .av-btn--submit { background: var(--color-primary); color: #fff; }
+.av-btn--review { background: #16a34a; color: #fff; }
 
 /* Annotation spans */
 .av-span-mine {

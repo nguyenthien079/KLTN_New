@@ -157,6 +157,14 @@ export const saveSubmission = async (articleId, annotations, submit = false) => 
   return response.data;
 };
 
+export const exportArticleAnnotations = async (articleId, format = 'json') => {
+  const response = await api.get(`/api/labeling/articles/${articleId}/export`, {
+    params: { format },
+    responseType: 'blob',
+  });
+  return response;
+};
+
 export const assignArticle = async (articleId, labelerId, blindMode = false) => {
   const response = await api.post('/api/labeling/assign', {
     article_id: articleId,

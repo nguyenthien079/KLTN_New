@@ -1,5 +1,9 @@
 # backend/app/routers/labeling.py
-from fastapi import APIRouter, Depends, HTTPException
+import csv
+import io
+import json as json_lib
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete as sa_delete
@@ -276,6 +280,93 @@ async def assign_article(
     db.add(assignment)
     await db.commit()
     return {"status": "assigned"}
+
+
+@router.get("/articles/{article_id}/export")
+async def export_article_annotations(
+    article_id: int,
+    format: str = Query("json", pattern="^(json|csv)$"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_expert_or_admin),
+):
+    """Export all submitted annotations for an article as JSON or CSV.
+    Only submitted annotations are included. Requires expert or admin role.
+    """
+    article = await db.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
+
+    subs_result = await db.execute(
+        select(LabelSubmission)
+        .where(LabelSubmission.article_id == article_id)
+        .where(LabelSubmission.status == "submitted")
+        .options(selectinload(LabelSubmission.annotations))
+    )
+    subs = subs_result.scalars().all()
+
+    # batch-load labeler names
+    labeler_ids = {s.labeler_id for s in subs}
+    users_result = await db.execute(select(User).where(User.id.in_(labeler_ids)))
+    users_map = {u.id: (u.display_name or u.username) for u in users_result.scalars().all()}
+
+    clean_text = article.clean_text or ""
+
+    if format == "json":
+        data = {
+            "article_id": article_id,
+            "title": article.title,
+            "url": article.url,
+            "full_text": clean_text,
+            "submissions": [
+                {
+                    "labeler": users_map.get(s.labeler_id, s.labeler_id[:8]),
+                    "status": s.status,
+                    "annotations": [
+                        {
+                            "entity_type": ann.entity_type,
+                            "start_offset": ann.start_offset,
+                            "end_offset": ann.end_offset,
+                            "surface_text": ann.surface_text,
+                            "comment": ann.comment,
+                        }
+                        for ann in sorted(s.annotations, key=lambda a: a.start_offset)
+                    ],
+                }
+                for s in subs
+            ],
+        }
+        filename = f"article_{article_id}_annotations.json"
+        return Response(
+            content=json_lib.dumps(data, ensure_ascii=False, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["article_id", "title", "labeler", "entity_type",
+                     "start_offset", "end_offset", "surface_text", "comment"])
+    for s in subs:
+        labeler_name = users_map.get(s.labeler_id, s.labeler_id[:8])
+        for ann in sorted(s.annotations, key=lambda a: a.start_offset):
+            writer.writerow([
+                article_id,
+                article.title or "",
+                labeler_name,
+                ann.entity_type,
+                ann.start_offset,
+                ann.end_offset,
+                ann.surface_text or "",
+                ann.comment or "",
+            ])
+
+    filename = f"article_{article_id}_annotations.csv"
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.patch("/assignments/{assignment_id}/blind-mode")

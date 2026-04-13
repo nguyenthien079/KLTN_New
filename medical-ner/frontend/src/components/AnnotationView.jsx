@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getLabelingArticle, getArticleSubmissions, saveSubmission } from '../services/api';
+import { getLabelingArticle, getArticleSubmissions, saveSubmission, exportArticleAnnotations } from '../services/api';
 import { ENTITY_COLORS } from '../config/entityColors';
 import './AnnotationView.css';
 
@@ -123,8 +123,18 @@ function EntityPopup({ popup, onConfirm, onCancel }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function AnnotationView({ articleId, onBack }) {
   const { user } = useAuth();
+  const canReview = user.role === 'chuyen_gia' || user.role === 'admin';
   const [article, setArticle] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [myAnnotations, setMyAnnotations] = useState([]);
@@ -208,6 +218,32 @@ export default function AnnotationView({ articleId, onBack }) {
     }
   };
 
+  const handleCompleteReview = async () => {
+    setSaving(true);
+    try {
+      // save expert's own annotations as submitted
+      await saveSubmission(articleId, myAnnotations, true);
+
+      // download JSON export
+      const jsonResp = await exportArticleAnnotations(articleId, 'json');
+      downloadBlob(jsonResp.data, `article_${articleId}_annotations.json`);
+
+      // download CSV export
+      const csvResp = await exportArticleAnnotations(articleId, 'csv');
+      downloadBlob(csvResp.data, `article_${articleId}_annotations.csv`);
+
+      setSaveMsg('Đã hoàn thành review. Đang tải xuống file...');
+      setTimeout(() => setSaveMsg(null), 3000);
+      const subs = await getArticleSubmissions(articleId);
+      setSubmissions(subs);
+    } catch {
+      setSaveMsg('Lỗi khi hoàn thành review.');
+      setTimeout(() => setSaveMsg(null), 2000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!article) return <div className="av-loading">Đang tải...</div>;
   if (fetchError) return <div className="av-loading">{fetchError}</div>;
 
@@ -251,6 +287,11 @@ export default function AnnotationView({ articleId, onBack }) {
           <button className="av-btn av-btn--submit" onClick={() => handleSave(true)} disabled={saving}>
             Nộp
           </button>
+          {canReview && (
+            <button className="av-btn av-btn--review" onClick={handleCompleteReview} disabled={saving}>
+              Hoàn thành review
+            </button>
+          )}
         </div>
       </div>
     </div>
