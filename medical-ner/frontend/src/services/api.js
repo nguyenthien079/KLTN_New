@@ -48,8 +48,9 @@ export const getStats = async () => {
   return response.data;
 };
 
-export const startCrawl = async (url) => {
-  const response = await api.post('/api/crawl/start', { url });
+export const startCrawl = async (url, urls = null) => {
+  const body = urls && urls.length > 0 ? { url, urls } : { url };
+  const response = await api.post('/api/crawl/start', body);
   return response.data;
 };
 

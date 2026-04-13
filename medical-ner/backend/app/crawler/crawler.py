@@ -21,6 +21,72 @@ class MedicalCrawler:
         self.visited_urls: Set[str] = set()
         self.crawled_articles: List[Dict] = []
 
+    async def crawl_url_list(
+        self,
+        urls: List[str],
+        on_progress: Optional[Callable[[int, int, str, str, str], None]] = None
+    ) -> List[Article]:
+        """Crawl an explicit list of URLs (no further discovery).
+        on_progress(processed, saved, url, title, result)
+          processed — total URLs attempted so far (drives the progress bar)
+          saved     — articles successfully fetched & queued for DB save
+          url       — current URL
+          title     — extracted title (empty string if unavailable)
+          result    — 'ok' | 'skip' | 'fail'
+        """
+        crawled = []
+        total = len(urls)
+        processed = 0
+        print(f"[Crawler] List mode: {total} URLs to crawl")
+
+        for url in urls:
+            processed += 1
+
+            if url in self.visited_urls:
+                if on_progress:
+                    on_progress(processed, len(crawled), url, "", "skip")
+                print(f"  [{processed:>4}/{total}] SKIP (already visited): {url}")
+                continue
+
+            self.visited_urls.add(url)
+
+            html = await self.extractor.fetch_html(url)
+            if not html:
+                if on_progress:
+                    on_progress(processed, len(crawled), url, "", "fail")
+                print(f"  [{processed:>4}/{total}] FAIL (cannot fetch): {url}")
+                continue
+
+            extracted = self.extractor.extract_clean_text(html)
+            if extracted["char_count"] < 100:
+                if on_progress:
+                    on_progress(processed, len(crawled), url, extracted.get("title", ""), "skip")
+                print(f"  [{processed:>4}/{total}] SKIP (too short, {extracted['char_count']} chars): {url}")
+                continue
+
+            domain = urlparse(url).netloc
+            article_data = {
+                "url": url,
+                "title": extracted["title"],
+                "raw_html": html,
+                "clean_text": extracted["clean_text"],
+                "char_count": extracted["char_count"],
+                "source_domain": domain,
+                "content_hash": self.deduplicator.compute_hash(extracted["clean_text"]),
+                "status": CrawlStatus.COMPLETED,
+            }
+            crawled.append(article_data)
+            if on_progress:
+                on_progress(processed, len(crawled), url, extracted.get("title", ""), "ok")
+            print(f"  [{processed:>4}/{total}] OK  ({extracted['char_count']:>6} chars): {extracted['title'][:60] or url}")
+
+            await asyncio.sleep(config.request_delay)
+
+        print(f"[Crawler] List crawl done. Saving {len(crawled)} articles to DB...")
+        saved = await self._save_articles(crawled)
+        print(f"[Crawler] Saved {len(saved)} new articles (skipped {len(crawled)-len(saved)} duplicates)")
+        return saved
+
     async def crawl_site(
         self,
         start_url: str,

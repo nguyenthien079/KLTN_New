@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { startDiscovery, getDiscoveryStatus, startCrawl } from '../services/api';
+import { startDiscovery, getDiscoveryStatus } from '../services/api';
 import './DiscoverPage.css';
 
-export default function DiscoverPage() {
+const LS_KEY = 'medical_ner_discover_job_id';
+
+export default function DiscoverPage({ isBlocked, onStatusChange, onCrawlNow }) {
   const [url, setUrl] = useState('');
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState(null); // null | 'running' | 'completed' | 'failed'
@@ -11,9 +13,23 @@ export default function DiscoverPage() {
   const [urls, setUrls] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [error, setError] = useState(null);
-  const [crawlMsg, setCrawlMsg] = useState(null);
+  const [showLog, setShowLog] = useState(false);
   const logRef = useRef(null);
   const pollRef = useRef(null);
+
+  // Restore jobId from localStorage on mount (resume after navigation)
+  useEffect(() => {
+    const savedJobId = localStorage.getItem(LS_KEY);
+    if (savedJobId) {
+      setStatus('running');
+      setJobId(savedJobId);
+    }
+  }, []);
+
+  // Notify parent when running status changes
+  useEffect(() => {
+    if (onStatusChange) onStatusChange(status);
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll log
   useEffect(() => {
@@ -22,7 +38,7 @@ export default function DiscoverPage() {
     }
   }, [logs]);
 
-  // Polling
+  // Polling — starts when jobId is set, stops when done
   useEffect(() => {
     if (!jobId) return;
     clearInterval(pollRef.current);
@@ -33,13 +49,21 @@ export default function DiscoverPage() {
         setUrlCount(data.url_count);
         setLogs(data.logs || []);
         setUrls(data.urls || []);
-        if (data.status === 'completed' || data.status === 'failed') {
+        if (data.status === 'completed') {
           clearInterval(pollRef.current);
+          localStorage.removeItem(LS_KEY);
+          // Auto-select all on completion
+          setSelected(new Set(data.urls || []));
+        }
+        if (data.status === 'failed') {
+          clearInterval(pollRef.current);
+          localStorage.removeItem(LS_KEY);
         }
       } catch {
         clearInterval(pollRef.current);
         setStatus('failed');
         setError('Mất kết nối — không thể theo dõi tiến trình.');
+        localStorage.removeItem(LS_KEY);
       }
     }, 2000);
     return () => clearInterval(pollRef.current);
@@ -51,16 +75,29 @@ export default function DiscoverPage() {
     setLogs([]);
     setUrls([]);
     setSelected(new Set());
-    setCrawlMsg(null);
     setStatus('running');
     setUrlCount(0);
+    setShowLog(false);
     try {
       const data = await startDiscovery(url.trim());
       setJobId(data.job_id);
+      localStorage.setItem(LS_KEY, data.job_id);
     } catch (err) {
       setStatus('failed');
       setError(err.response?.data?.detail || 'Không thể bắt đầu tìm kiếm.');
+      localStorage.removeItem(LS_KEY);
     }
+  };
+
+  const handleReset = () => {
+    setStatus(null);
+    setJobId(null);
+    setLogs([]);
+    setUrls([]);
+    setSelected(new Set());
+    setUrlCount(0);
+    setError(null);
+    setShowLog(false);
   };
 
   const toggleSelect = (u) => {
@@ -79,29 +116,26 @@ export default function DiscoverPage() {
     }
   };
 
-  const handleCrawlSelected = async () => {
-    if (selected.size === 0) return;
-    setCrawlMsg(null);
-    try {
-      for (const u of selected) {
-        await startCrawl(u);
-      }
-      setCrawlMsg(`Đã bắt đầu crawl ${selected.size} URL. Chuyển sang tab "Crawl" để theo dõi.`);
-    } catch (err) {
-      setCrawlMsg('Lỗi khi bắt đầu crawl: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
   const handleExport = (format) => {
     const list = urls.length > 0 ? urls : [];
+    // Use the searched domain as filename base, fallback to 'discovered-urls'
+    let baseName = 'discovered-urls';
+    try {
+      const parsed = new URL(url);
+      // hostname e.g. "bachmai.hanoi.gov.vn", strip leading "www."
+      baseName = parsed.hostname.replace(/^www\./, '');
+    } catch {
+      // url might be empty or invalid — keep default
+    }
+
     let content, filename, type;
     if (format === 'json') {
       content = JSON.stringify({ url, total: list.length, urls: list }, null, 2);
-      filename = 'discovered-urls.json';
+      filename = `${baseName}.json`;
       type = 'application/json';
     } else {
       content = 'url\n' + list.join('\n');
-      filename = 'discovered-urls.csv';
+      filename = `${baseName}.csv`;
       type = 'text/csv';
     }
     const blob = new Blob([content], { type });
@@ -113,10 +147,109 @@ export default function DiscoverPage() {
   };
 
   const allChecked = urls.length > 0 && selected.size === urls.length;
+  const isDone = status === 'completed' || status === 'failed';
 
+  // ── Completed state ──────────────────────────────────────────────────────────
+  if (isDone) {
+    return (
+      <div className="discover-page">
+        {/* Compact "done" header */}
+        <div className="discover-done-header">
+          <div className="discover-done-meta">
+            <span className={`discover-badge discover-badge--${status}`}>
+              {status === 'completed' ? '✓ Hoàn thành' : '✗ Lỗi'}
+            </span>
+            <span className="discover-done-url" title={url}>{url}</span>
+            <span className="discover-done-count">{urlCount} URLs</span>
+          </div>
+          <div className="discover-done-actions-right">
+            {logs.length > 0 && (
+              <button
+                className="discover-log-toggle"
+                onClick={() => setShowLog(v => !v)}
+              >
+                {showLog ? 'Ẩn log' : 'Xem log'}
+              </button>
+            )}
+            <button className="discover-reset-btn" onClick={handleReset}>
+              Tìm lại
+            </button>
+          </div>
+        </div>
+
+        {/* Collapsible log */}
+        {showLog && (
+          <div className="discover-log discover-log--collapsed" ref={logRef}>
+            {logs.map((line, i) => (
+              <div key={i} className="discover-log-line">{line}</div>
+            ))}
+          </div>
+        )}
+
+        {/* URL list — main content */}
+        {urls.length > 0 && (
+          <div className="discover-results">
+            <div className="discover-results-header">
+              <label className="discover-check-all">
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  onChange={toggleAll}
+                />
+                Chọn tất cả ({urls.length})
+              </label>
+              <div className="discover-export-btns">
+                <button className="discover-export-btn" onClick={() => handleExport('json')}>
+                  Export JSON
+                </button>
+                <button className="discover-export-btn" onClick={() => handleExport('csv')}>
+                  Export CSV
+                </button>
+              </div>
+            </div>
+
+            <div className="discover-url-list">
+              {urls.map((u, i) => (
+                <label key={i} className="discover-url-item">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(u)}
+                    onChange={() => toggleSelect(u)}
+                  />
+                  <span className="discover-url-text">{u}</span>
+                </label>
+              ))}
+            </div>
+
+            {/* Primary CTA */}
+            {onCrawlNow && (
+              <div className="discover-crawl-cta-row">
+                <span className="discover-crawl-cta-hint">
+                  {selected.size} / {urls.length} URL đã chọn
+                </span>
+                <button
+                  className="discover-crawl-cta-btn"
+                  disabled={selected.size === 0}
+                  onClick={() => onCrawlNow(url, Array.from(selected))}
+                >
+                  Bắt đầu crawl {selected.size} URLs →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {status === 'failed' && (
+          <p className="discover-error">{error || 'Tìm kiếm thất bại.'}</p>
+        )}
+      </div>
+    );
+  }
+
+  // ── Normal / running state ───────────────────────────────────────────────────
   return (
     <div className="discover-page">
-      {/* Input */}
+      {/* Input form */}
       <div className="discover-form">
         <div className="discover-input-row">
           <input
@@ -130,93 +263,37 @@ export default function DiscoverPage() {
           <button
             className="discover-btn"
             onClick={handleStart}
-            disabled={status === 'running'}
+            disabled={status === 'running' || isBlocked}
+            title={isBlocked ? 'Đang crawl — vui lòng chờ crawl xong.' : ''}
           >
             {status === 'running' ? 'Đang tìm...' : 'Bắt đầu tìm'}
           </button>
         </div>
+        {isBlocked && status !== 'running' && (
+          <p className="discover-error">Đang crawl — không thể bắt đầu tìm site cùng lúc.</p>
+        )}
         {error && <p className="discover-error">{error}</p>}
       </div>
 
-      {/* Monitor */}
-      {status && (
+      {/* Running monitor */}
+      {status === 'running' && (
         <div className="discover-monitor">
           <div className="discover-status-row">
-            <span className={`discover-badge discover-badge--${status}`}>
-              {status === 'running' && '● Đang tìm'}
-              {status === 'completed' && '✓ Hoàn thành'}
-              {status === 'failed' && '✗ Lỗi'}
-            </span>
+            <span className="discover-badge discover-badge--running">● Đang tìm</span>
             <span className="discover-count">{urlCount} URLs tìm được</span>
           </div>
 
           <div className="discover-progress-bar">
-            <div className={`discover-progress-fill${status === 'running' ? ' discover-progress-fill--indeterminate' : ' discover-progress-fill--done'}`} />
+            <div className="discover-progress-fill discover-progress-fill--indeterminate" />
           </div>
 
           <div className="discover-log" ref={logRef}>
-            {logs.length === 0 && status === 'running' && (
+            {logs.length === 0 && (
               <span className="discover-log-placeholder">Đang khởi động...</span>
             )}
             {logs.map((line, i) => (
               <div key={i} className="discover-log-line">{line}</div>
             ))}
-            {status === 'completed' && (
-              <div className="discover-log-line discover-log-done">
-                ✓ Tìm xong — {urlCount} URLs trong domain.
-              </div>
-            )}
-            {status === 'failed' && (
-              <div className="discover-log-line discover-log-error">✗ Tìm kiếm thất bại.</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* URL list */}
-      {urls.length > 0 && (
-        <div className="discover-results">
-          <div className="discover-results-header">
-            <label className="discover-check-all">
-              <input
-                type="checkbox"
-                checked={allChecked}
-                onChange={toggleAll}
-              />
-              Chọn tất cả ({urls.length})
-            </label>
-            <div className="discover-export-btns">
-              <button className="discover-export-btn" onClick={() => handleExport('json')}>
-                Export JSON
-              </button>
-              <button className="discover-export-btn" onClick={() => handleExport('csv')}>
-                Export CSV
-              </button>
-            </div>
-          </div>
-
-          <div className="discover-url-list">
-            {urls.map((u, i) => (
-              <label key={i} className="discover-url-item">
-                <input
-                  type="checkbox"
-                  checked={selected.has(u)}
-                  onChange={() => toggleSelect(u)}
-                />
-                <span className="discover-url-text">{u}</span>
-              </label>
-            ))}
-          </div>
-
-          <div className="discover-actions">
-            {crawlMsg && <p className="discover-crawl-msg">{crawlMsg}</p>}
-            <button
-              className="discover-crawl-btn"
-              onClick={handleCrawlSelected}
-              disabled={selected.size === 0}
-            >
-              Crawl đã chọn ({selected.size})
-            </button>
           </div>
         </div>
       )}
