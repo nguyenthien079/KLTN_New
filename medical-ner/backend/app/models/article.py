@@ -28,7 +28,11 @@ class Article(Base):
     # Metadata
     crawl_batch_id = Column(Integer, index=True)
     crawled_at = Column(DateTime(timezone=True), server_default=func.now())
-    status = Column(SQLEnum(CrawlStatus), default=CrawlStatus.PENDING, index=True)
+    status = Column(
+        SQLEnum(CrawlStatus, values_callable=lambda obj: [e.value for e in obj]),
+        default=CrawlStatus.PENDING,
+        index=True,
+    )
 
     # Deduplication
     content_hash = Column(String(64), index=True)

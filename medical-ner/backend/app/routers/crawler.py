@@ -36,6 +36,7 @@ class CrawlStatusResponse(BaseModel):
     status: str
     progress: dict  # {pages_crawled, total_urls (or None)}
     logs: list[str] = []
+    error: str | None = None
 
 
 @router.post("/start")
@@ -78,7 +79,8 @@ async def get_crawl_status(job_id: str):
             "urls_processed": job.get("urls_processed", 0),  # URLs attempted
             "total_urls": job.get("total_urls"),              # None = BFS mode
         },
-        logs=job.get("logs", [])
+        logs=job.get("logs", []),
+        error=job.get("error"),
     )
 
 

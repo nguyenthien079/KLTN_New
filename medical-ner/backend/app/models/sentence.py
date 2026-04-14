@@ -26,7 +26,11 @@ class Sentence(Base):
     word_count = Column(Integer)
 
     # Processing status
-    pipeline_status = Column(SQLEnum(PipelineStatus), default=PipelineStatus.RAW, index=True)
+    pipeline_status = Column(
+        SQLEnum(PipelineStatus, values_callable=lambda obj: [e.value for e in obj]),
+        default=PipelineStatus.RAW,
+        index=True,
+    )
 
     # Quality flags
     is_medical = Column(Boolean, default=False, index=True)

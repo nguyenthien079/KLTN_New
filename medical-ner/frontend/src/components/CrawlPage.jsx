@@ -48,6 +48,9 @@ export default function CrawlPage() {
         setStatus(data.status);
         setProgress(data.progress);
         setLogs(data.logs || []);
+        if (data.status === 'failed' && data.error) {
+          setError(data.error);
+        }
         if (data.status === 'completed' || data.status === 'failed') {
           clearInterval(pollRef.current);
           localStorage.removeItem(LS_KEY);
@@ -219,7 +222,9 @@ export default function CrawlPage() {
                 </div>
               )}
               {status === 'failed' && (
-                <div className="crawl-log-line crawl-log-error">✗ Crawl thất bại.</div>
+                <div className="crawl-log-line crawl-log-error">
+                  ✗ Crawl thất bại{error ? `: ${error}` : '.'}
+                </div>
               )}
             </div>
           </div>
