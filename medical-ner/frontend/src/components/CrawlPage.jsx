@@ -63,7 +63,7 @@ export default function CrawlPage() {
   }, [jobId]);
 
   const handleStart = async () => {
-    if (!url.trim()) { setError('Vui lòng nhập URL.'); return; }
+    if (!url.trim() && !pendingUrls) { setError('Vui lòng nhập URL.'); return; }
     setError(null);
     setLogs([]);
     setProgress({ pages_crawled: 0, urls_processed: 0, total_urls: pendingUrls ? pendingUrls.length : null });
