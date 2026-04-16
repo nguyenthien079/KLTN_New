@@ -95,17 +95,17 @@ export const createUser = async (data) => {
 };
 
 export const getReviewQueue = async () => {
-  const response = await api.get('/api/feedback/queue');
+  const response = await api.get('/api/labeling/review/queue');
   return response.data;
 };
 
 export const confirmCorrection = async (id) => {
-  const response = await api.patch(`/api/feedback/${id}/confirm`);
+  const response = await api.patch(`/api/labeling/review/${id}/confirm`);
   return response.data;
 };
 
 export const rejectCorrection = async (id) => {
-  const response = await api.patch(`/api/feedback/${id}/reject`);
+  const response = await api.patch(`/api/labeling/review/${id}/reject`);
   return response.data;
 };
 

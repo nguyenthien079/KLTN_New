@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     DEBUG: bool = True
     ENVIRONMENT: str = "development"
+    SQL_ECHO: bool = False
 
     # Security
     SECRET_KEY: str

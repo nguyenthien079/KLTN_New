@@ -26,8 +26,10 @@ export default function LabelingPage() {
   }
 
   const STATUS_LABEL = {
-    submitted: 'Đã nộp',
     draft: 'Đang làm',
+    submitted: 'Đã nộp',
+    confirmed: 'Đã duyệt',
+    rejected: 'Bị từ chối',
   };
 
   return (

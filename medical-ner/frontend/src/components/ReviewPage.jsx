@@ -75,9 +75,13 @@ export default function ReviewPage() {
                 {STATUS_LABEL[item.status] || item.status}
               </span>
               <span className="review-labeler">
-                {item.labeler_id ? `Labeler: ${item.labeler_id.slice(0, 8)}` : ''}
+                {item.labeler_id ? `Labeler: ${item.labeler_id}` : ''}
               </span>
             </div>
+
+            {item.article_title && (
+              <p className="review-text"><strong>Bài viết:</strong> {item.article_title}</p>
+            )}
 
             <p className="review-text">{item.original_text}</p>
 

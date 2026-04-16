@@ -79,6 +79,17 @@ class SubmissionOut(BaseModel):
     annotations: list[AnnotationOut]
 
 
+class ReviewQueueItem(BaseModel):
+    id: str
+    article_id: int
+    article_title: Optional[str]
+    original_text: str
+    original_entities: list
+    corrected_entities: list
+    status: str
+    labeler_id: str
+
+
 # ── Endpoints ─────────────────────────────────────────────
 
 @router.get("/articles", response_model=list[ArticleListItem])
@@ -299,7 +310,7 @@ async def export_article_annotations(
     subs_result = await db.execute(
         select(LabelSubmission)
         .where(LabelSubmission.article_id == article_id)
-        .where(LabelSubmission.status == "submitted")
+        .where(LabelSubmission.status.in_(["submitted", "confirmed"]))
         .options(selectinload(LabelSubmission.annotations))
     )
     subs = subs_result.scalars().all()
@@ -383,3 +394,87 @@ async def toggle_blind_mode(
     a.blind_mode = body.blind_mode
     await db.commit()
     return {"assignment_id": assignment_id, "blind_mode": body.blind_mode}
+
+
+@router.get("/review/queue", response_model=list[ReviewQueueItem])
+async def get_label_review_queue(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_expert_or_admin),
+):
+    """Expert/Admin: list submitted and reviewed label submissions."""
+    result = await db.execute(
+        select(LabelSubmission)
+        .where(LabelSubmission.status.in_(["submitted", "confirmed", "rejected"]))
+        .options(selectinload(LabelSubmission.annotations))
+        .order_by(LabelSubmission.updated_at.desc())
+    )
+    submissions = result.scalars().all()
+
+    article_ids = {s.article_id for s in submissions}
+    labeler_ids = {s.labeler_id for s in submissions}
+
+    articles_map = {}
+    if article_ids:
+        articles_result = await db.execute(select(Article).where(Article.id.in_(article_ids)))
+        articles_map = {a.id: a for a in articles_result.scalars().all()}
+
+    users_map = {}
+    if labeler_ids:
+        users_result = await db.execute(select(User).where(User.id.in_(labeler_ids)))
+        users_map = {u.id: u for u in users_result.scalars().all()}
+
+    items = []
+    for sub in submissions:
+        article = articles_map.get(sub.article_id)
+        labeler = users_map.get(sub.labeler_id)
+        items.append(ReviewQueueItem(
+            id=sub.id,
+            article_id=sub.article_id,
+            article_title=article.title if article else None,
+            original_text=article.clean_text if article and article.clean_text else "",
+            original_entities=[],
+            corrected_entities=[
+                {
+                    "text": ann.surface_text or "",
+                    "type": ann.entity_type,
+                    "start": ann.start_offset,
+                    "end": ann.end_offset,
+                    "comment": ann.comment,
+                }
+                for ann in sorted(sub.annotations, key=lambda a: a.start_offset)
+            ],
+            status="pending_review" if sub.status == "submitted" else sub.status,
+            labeler_id=(labeler.display_name or labeler.username) if labeler else sub.labeler_id,
+        ))
+
+    return items
+
+
+@router.patch("/review/{submission_id}/confirm")
+async def confirm_label_submission(
+    submission_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_expert_or_admin),
+):
+    result = await db.execute(select(LabelSubmission).where(LabelSubmission.id == submission_id))
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Không tìm thấy submission")
+    sub.status = "confirmed"
+    await db.commit()
+    return {"id": submission_id, "status": "confirmed"}
+
+
+@router.patch("/review/{submission_id}/reject")
+async def reject_label_submission(
+    submission_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_expert_or_admin),
+):
+    result = await db.execute(select(LabelSubmission).where(LabelSubmission.id == submission_id))
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Không tìm thấy submission")
+    sub.status = "rejected"
+    await db.commit()
+    return {"id": submission_id, "status": "rejected"}
