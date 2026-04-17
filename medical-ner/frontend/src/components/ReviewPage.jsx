@@ -8,6 +8,67 @@ const STATUS_LABEL = {
   rejected: 'Từ chối',
 };
 
+function normalizeEntity(entity) {
+  const start = Number.isInteger(entity.start) ? entity.start : entity.start_offset;
+  const end = Number.isInteger(entity.end) ? entity.end : entity.end_offset;
+  return {
+    text: entity.text || entity.surface_text || '',
+    type: entity.type || entity.entity_type || 'ENTITY',
+    start,
+    end,
+  };
+}
+
+function renderHighlightedText(text, entities) {
+  if (!text) return null;
+
+  const normalized = (entities || [])
+    .map(normalizeEntity)
+    .filter((e) => Number.isInteger(e.start) && Number.isInteger(e.end) && e.start >= 0 && e.end > e.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+
+  if (normalized.length === 0) {
+    return <span>{text}</span>;
+  }
+
+  const parts = [];
+  let cursor = 0;
+
+  normalized.forEach((entity, idx) => {
+    const start = Math.min(entity.start, text.length);
+    const end = Math.min(entity.end, text.length);
+
+    if (start < cursor || end <= start) {
+      return;
+    }
+
+    if (cursor < start) {
+      parts.push(
+        <span key={`plain-${idx}-${cursor}`}>{text.slice(cursor, start)}</span>
+      );
+    }
+
+    const surface = text.slice(start, end);
+    parts.push(
+      <mark
+        key={`mark-${idx}-${start}`}
+        className="review-highlight"
+        title={`${entity.type}${entity.text ? `: ${entity.text}` : ''}`}
+      >
+        {surface}
+      </mark>
+    );
+
+    cursor = end;
+  });
+
+  if (cursor < text.length) {
+    parts.push(<span key={`plain-tail-${cursor}`}>{text.slice(cursor)}</span>);
+  }
+
+  return parts;
+}
+
 export default function ReviewPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +144,9 @@ export default function ReviewPage() {
               <p className="review-text"><strong>Bài viết:</strong> {item.article_title}</p>
             )}
 
-            <p className="review-text">{item.original_text}</p>
+            <p className="review-text review-text--annotated">
+              {renderHighlightedText(item.original_text, item.corrected_entities)}
+            </p>
 
             <div className="review-entities">
               <div className="review-entities-col">
