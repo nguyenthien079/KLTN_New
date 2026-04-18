@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUsers, createUser, getRoleRequests, approveRoleRequest, rejectRoleRequest } from '../services/api';
+import { getUsers, createUser, updateUser, deleteUser, getRoleRequests, approveRoleRequest, rejectRoleRequest } from '../services/api';
 import './UsersPage.css';
 
 const ROLE_LABEL = { admin: 'Admin', chuyen_gia: 'Chuyên gia', labeler: 'Labeler' };
@@ -14,6 +14,9 @@ export default function UsersPage() {
   const [roleRequests, setRoleRequests] = useState([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ display_name: '', role: 'labeler', password: '' });
+  const [editError, setEditError] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -79,6 +82,50 @@ export default function UsersPage() {
     }
   };
 
+  const startEdit = (user) => {
+    setEditingId(user.user_id);
+    setEditForm({
+      display_name: user.display_name || '',
+      role: user.role,
+      password: '',
+    });
+    setEditError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditError(null);
+  };
+
+  const saveEdit = async (userId) => {
+    setEditError(null);
+    try {
+      const payload = {
+        display_name: editForm.display_name,
+        role: editForm.role,
+      };
+      if (editForm.password.trim()) {
+        payload.password = editForm.password.trim();
+      }
+      const updated = await updateUser(userId, payload);
+      setUsers((prev) => prev.map((u) => (u.user_id === userId ? updated : u)));
+      setEditingId(null);
+    } catch (err) {
+      setEditError(err.response?.data?.detail || 'Không thể cập nhật user.');
+    }
+  };
+
+  const handleDelete = async (userId) => {
+    const ok = window.confirm('Bạn có chắc muốn xóa tài khoản này?');
+    if (!ok) return;
+    try {
+      await deleteUser(userId);
+      setUsers((prev) => prev.filter((u) => u.user_id !== userId));
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Không thể xóa tài khoản.');
+    }
+  };
+
   return (
     <div className="users-page">
       <div className="users-table-wrap">
@@ -91,23 +138,65 @@ export default function UsersPage() {
                 <th>Tên hiển thị</th>
                 <th>Tên đăng nhập</th>
                 <th>Quyền</th>
+                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.user_id}>
-                  <td>{u.display_name || '—'}</td>
+                  <td>
+                    {editingId === u.user_id ? (
+                      <input
+                        className="users-input users-input--inline"
+                        value={editForm.display_name}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, display_name: e.target.value }))}
+                      />
+                    ) : (u.display_name || '—')}
+                  </td>
                   <td className="users-username">{u.username}</td>
                   <td>
-                    <span className={`users-role-badge users-role-badge--${u.role}`}>
-                      {ROLE_LABEL[u.role] || u.role}
-                    </span>
+                    {editingId === u.user_id ? (
+                      <select
+                        className="users-select users-select--inline"
+                        value={editForm.role}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, role: e.target.value }))}
+                      >
+                        <option value="labeler">Labeler</option>
+                        <option value="chuyen_gia">Chuyên gia</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    ) : (
+                      <span className={`users-role-badge users-role-badge--${u.role}`}>
+                        {ROLE_LABEL[u.role] || u.role}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {editingId === u.user_id ? (
+                      <div className="users-actions-inline">
+                        <input
+                          className="users-input users-input--inline"
+                          type="password"
+                          placeholder="Mật khẩu mới (tuỳ chọn)"
+                          value={editForm.password}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, password: e.target.value }))}
+                        />
+                        <button className="users-request-btn users-request-btn--approve" onClick={() => saveEdit(u.user_id)}>Lưu</button>
+                        <button className="users-request-btn users-request-btn--reject" onClick={cancelEdit}>Hủy</button>
+                      </div>
+                    ) : (
+                      <div className="users-actions-inline">
+                        <button className="users-request-btn users-request-btn--approve" onClick={() => startEdit(u)}>Sửa</button>
+                        <button className="users-request-btn users-request-btn--reject" onClick={() => handleDelete(u.user_id)}>Xóa</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+        {editError && <p className="users-error">{editError}</p>}
       </div>
 
       <div className="users-create-form-wrap">

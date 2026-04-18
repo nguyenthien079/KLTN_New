@@ -12,6 +12,8 @@ import ReviewPage from './components/ReviewPage';
 import UsersPage from './components/UsersPage';
 import LoginPage from './components/LoginPage';
 import LabelingPage from './components/LabelingPage';
+import AdminDashboardPage from './components/AdminDashboardPage';
+import DataListPage from './components/DataListPage';
 import './App.css';
 
 function App() {
@@ -24,6 +26,7 @@ function App() {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('ner');
   const [upgradeMsg, setUpgradeMsg] = useState(null);
+  const role = user?.role;
 
   const handleRequestUpgrade = async () => {
     try {
@@ -36,10 +39,8 @@ function App() {
     }
   };
 
-  if (!user) return <LoginPage />;
-
   const roleTabConfig = useMemo(() => {
-    if (user.role === 'labeler') {
+    if (role === 'labeler') {
       return [
         { id: 'ner', label: 'Phân tích NER' },
         { id: 'crawl', label: 'Thu thập dữ liệu' },
@@ -47,17 +48,19 @@ function App() {
         { id: 'labeling', label: 'Labeling' },
       ];
     }
-    if (user.role === 'chuyen_gia') {
+    if (role === 'chuyen_gia') {
       return [{ id: 'labeling', label: 'Labeling' }];
     }
-    if (user.role === 'admin') {
+    if (role === 'admin') {
       return [
-        { id: 'review', label: 'Duyệt nhãn' },
-        { id: 'users', label: 'Người dùng' },
+        { id: 'dashboard', label: 'Dashboard' },
+        { id: 'data', label: 'Danh sách file/text' },
+        { id: 'review', label: 'Duyệt gán nhãn' },
+        { id: 'users', label: 'Quản lý user' },
       ];
     }
     return [{ id: 'labeling', label: 'Labeling' }];
-  }, [user.role]);
+  }, [role]);
 
   const allowedTabIds = useMemo(() => roleTabConfig.map((t) => t.id), [roleTabConfig]);
 
@@ -66,6 +69,8 @@ function App() {
       setTab(allowedTabIds[0] || 'labeling');
     }
   }, [allowedTabIds, tab]);
+
+  if (!user) return <LoginPage />;
 
   const handleTypeChange = (type) => {
     setInputType(type);
@@ -146,7 +151,9 @@ function App() {
         </div>
       </nav>
 
-      <div className={`content-wrap${tab === 'labeling' ? ' content-wrap--wide' : ''}`}>
+      <div className={`content-wrap${tab === 'labeling' || tab === 'data' ? ' content-wrap--wide' : ''}`}>
+        {tab === 'dashboard' && allowedTabIds.includes('dashboard') && <AdminDashboardPage />}
+        {tab === 'data' && allowedTabIds.includes('data') && <DataListPage />}
         {tab === 'ner' && allowedTabIds.includes('ner') && (
           <>
             <div className="main-grid">

@@ -92,6 +92,20 @@
   outline: none;
 }
 
+.users-input--inline,
+.users-select--inline {
+  font-size: 0.82rem;
+  padding: 6px 8px;
+  min-width: 150px;
+}
+
+.users-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .users-input:focus, .users-select:focus { border-color: var(--color-primary); }
 
 .users-create-btn {

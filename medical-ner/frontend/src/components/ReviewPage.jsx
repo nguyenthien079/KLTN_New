@@ -69,7 +69,7 @@ function renderHighlightedText(text, entities) {
   return parts;
 }
 
-export default function ReviewPage() {
+export default function ReviewPage({ readOnly = false }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -120,6 +120,7 @@ export default function ReviewPage() {
       <div className="review-summary">
         <span className="review-count">{pending.length} chờ duyệt</span>
         <span className="review-count-done">{done.length} đã xử lý</span>
+        {readOnly && <span className="review-count-done">Chế độ chỉ xem</span>}
         <button className="review-refresh-btn" onClick={load}>Làm mới</button>
       </div>
       {actionError && <p className="review-error">{actionError}</p>}
@@ -167,7 +168,7 @@ export default function ReviewPage() {
               </div>
             </div>
 
-            {item.status === 'pending_review' && (
+            {!readOnly && item.status === 'pending_review' && (
               <div className="review-actions">
                 <button
                   className="review-btn review-btn--confirm"

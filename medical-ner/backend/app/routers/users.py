@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.database import get_db
 from app.models.user import User
-from app.auth import hash_password, require_admin
+from app.auth import get_current_user, hash_password, require_admin
 
 router = APIRouter()
 
@@ -22,6 +22,12 @@ class CreateUserRequest(BaseModel):
     password: str
     display_name: str | None = None
     role: str = "labeler"
+
+
+class UpdateUserRequest(BaseModel):
+    display_name: str | None = None
+    role: str | None = None
+    password: str | None = None
 
 
 @router.get("", response_model=list[UserResponse])
@@ -70,3 +76,62 @@ async def create_user(
         display_name=user.display_name,
         role=user.role,
     )
+
+
+@router.patch("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: str,
+    request: UpdateUserRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+    if request.role is not None and request.role not in ("admin", "labeler", "chuyen_gia"):
+        raise HTTPException(status_code=400, detail="Role phải là admin, chuyen_gia hoặc labeler")
+
+    if request.role is not None:
+        # Prevent removing own admin role.
+        if user.id == current_user.id and request.role != "admin":
+            raise HTTPException(status_code=400, detail="Không thể tự hạ quyền admin của chính mình")
+        user.role = request.role
+
+    if request.display_name is not None:
+        user.display_name = request.display_name
+
+    if request.password:
+        user.hashed_password = hash_password(request.password)
+
+    await db.commit()
+    await db.refresh(user)
+    return UserResponse(
+        user_id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        role=user.role,
+    )
+
+
+@router.delete("/{user_id}")
+async def delete_user(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền này")
+
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Không thể xóa tài khoản của chính mình")
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+    await db.delete(user)
+    await db.commit()
+    return {"status": "deleted", "user_id": user_id}

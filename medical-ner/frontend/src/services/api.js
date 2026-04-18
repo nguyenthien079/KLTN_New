@@ -94,6 +94,16 @@ export const createUser = async (data) => {
   return response.data;
 };
 
+export const updateUser = async (userId, data) => {
+  const response = await api.patch(`/api/users/${userId}`, data);
+  return response.data;
+};
+
+export const deleteUser = async (userId) => {
+  const response = await api.delete(`/api/users/${userId}`);
+  return response.data;
+};
+
 export const getReviewQueue = async () => {
   const response = await api.get('/api/labeling/review/queue');
   return response.data;
