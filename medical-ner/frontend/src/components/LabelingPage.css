@@ -5,10 +5,37 @@
   gap: 16px;
 }
 
+.labeling-workspace {
+  display: grid;
+  grid-template-columns: 560px minmax(0, 1fr) 320px;
+  gap: 14px;
+  height: 72vh;
+  min-height: 68vh;
+}
+
+.labeling-column {
+  min-width: 0;
+}
+
+.labeling-column--left,
+.labeling-column--middle,
+.labeling-column--right {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.labeling-column--middle {
+  display: flex;
+  flex-direction: column;
+}
+
 .labeling-header {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .labeling-title {
@@ -22,16 +49,29 @@
   color: var(--color-text-muted);
 }
 
+.labeling-actions-inline {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
 .labeling-loading {
   color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
-.labeling-table-wrap {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+.labeling-toast {
+  font-size: 0.85rem;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 8px 10px;
   border-radius: 8px;
-  overflow: hidden;
+}
+
+.labeling-table-wrap {
+  height: 100%;
+  overflow: auto;
 }
 
 .labeling-table {
@@ -59,10 +99,19 @@
   vertical-align: middle;
 }
 
+.labeling-checkbox-cell {
+  width: 40px;
+  text-align: center;
+}
+
+.labeling-row--selected {
+  background: #f8fafc;
+}
+
 .labeling-table tr:last-child td { border-bottom: none; }
 
 .labeling-title-cell {
-  max-width: 500px;
+  max-width: none;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -70,10 +119,12 @@
 
 .labeling-article-title {
   font-size: 0.88rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 480px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  word-break: break-word;
+  line-height: 1.35;
+  max-width: none;
   display: block;
 }
 
@@ -109,6 +160,235 @@
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  margin-left: 8px;
 }
 
 .labeling-btn:hover { opacity: 0.9; }
+
+.labeling-btn--ghost {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.labeling-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.labeling-batch-toolbar {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.labeling-batch-toolbar span {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.labeling-articles-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.labeling-empty-panel {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  padding: 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+}
+
+.labeling-article-card {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.labeling-article-card-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.labeling-article-card-header h4 {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.labeling-article-text {
+  max-height: 230px;
+  overflow: auto;
+  padding: 10px 12px;
+}
+
+.labeling-article-text-inner {
+  line-height: 1.6;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+}
+
+.labeling-annotated-mark {
+  padding: 0 1px;
+  border-bottom: 2px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.labeling-side-title {
+  margin: 0;
+  padding: 12px;
+  font-size: 0.95rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.labeling-tag-groups {
+  height: calc(68vh - 49px);
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.labeling-tag-group {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.labeling-tag-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-left: 4px solid;
+  padding-left: 8px;
+}
+
+.labeling-tag-group-header span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.labeling-tag-group-header strong {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.labeling-tag-empty {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.labeling-tag-item {
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.labeling-tag-item-text {
+  font-size: 0.84rem;
+  color: var(--color-text);
+}
+
+.labeling-tag-item-meta {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.labeling-popup {
+  position: fixed;
+  z-index: 40;
+  width: 260px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.labeling-popup-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.labeling-popup-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.labeling-popup-type-btn {
+  border: 1px solid;
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.labeling-popup-comment {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  padding: 6px;
+  font-size: 0.78rem;
+  resize: vertical;
+}
+
+.labeling-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.labeling-popup-cancel {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+@media (max-width: 1200px) {
+  .labeling-workspace {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .labeling-column--left,
+  .labeling-column--middle,
+  .labeling-column--right {
+    min-height: 320px;
+  }
+
+  .labeling-articles-scroll,
+  .labeling-tag-groups {
+    height: auto;
+    max-height: 420px;
+  }
+}

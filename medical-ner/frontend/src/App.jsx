@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { analyzeText, analyzeUrl, requestRoleUpgrade } from './services/api';
 import { useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
@@ -38,18 +38,34 @@ function App() {
 
   if (!user) return <LoginPage />;
 
-  const canSeePipeline = user.role === 'admin' || user.role === 'chuyen_gia';
-  const canSeeReview = user.role === 'admin' || user.role === 'chuyen_gia';
-  const canSeeUsers = user.role === 'admin';
+  const roleTabConfig = useMemo(() => {
+    if (user.role === 'labeler') {
+      return [
+        { id: 'ner', label: 'Phân tích NER' },
+        { id: 'crawl', label: 'Thu thập dữ liệu' },
+        { id: 'pipeline', label: 'Pipeline' },
+        { id: 'labeling', label: 'Labeling' },
+      ];
+    }
+    if (user.role === 'chuyen_gia') {
+      return [{ id: 'labeling', label: 'Labeling' }];
+    }
+    if (user.role === 'admin') {
+      return [
+        { id: 'review', label: 'Duyệt nhãn' },
+        { id: 'users', label: 'Người dùng' },
+      ];
+    }
+    return [{ id: 'labeling', label: 'Labeling' }];
+  }, [user.role]);
 
-  const tabs = [
-    { id: 'ner', label: 'Phân tích NER' },
-    { id: 'crawl', label: 'Thu thập dữ liệu' },
-    ...(canSeePipeline ? [{ id: 'pipeline', label: 'Pipeline' }] : []),
-    { id: 'labeling', label: 'Labeling' },
-    ...(canSeeReview ? [{ id: 'review', label: 'Duyệt nhãn' }] : []),
-    ...(canSeeUsers ? [{ id: 'users', label: 'Người dùng' }] : []),
-  ];
+  const allowedTabIds = useMemo(() => roleTabConfig.map((t) => t.id), [roleTabConfig]);
+
+  useEffect(() => {
+    if (!allowedTabIds.includes(tab)) {
+      setTab(allowedTabIds[0] || 'labeling');
+    }
+  }, [allowedTabIds, tab]);
 
   const handleTypeChange = (type) => {
     setInputType(type);
@@ -88,6 +104,7 @@ function App() {
   };
 
   const handleTabChange = (newTab) => {
+    if (!allowedTabIds.includes(newTab)) return;
     setTab(newTab);
     if (newTab !== 'ner') {
       setLoading(false);
@@ -101,7 +118,7 @@ function App() {
 
       <nav className="tab-nav">
         <div className="tab-nav-inner">
-          {tabs.map((t) => (
+          {roleTabConfig.map((t) => (
             <button
               key={t.id}
               className={`tab-btn${tab === t.id ? ' tab-btn--active' : ''}`}
@@ -129,8 +146,8 @@ function App() {
         </div>
       </nav>
 
-      <div className="content-wrap">
-        {tab === 'ner' && (
+      <div className={`content-wrap${tab === 'labeling' ? ' content-wrap--wide' : ''}`}>
+        {tab === 'ner' && allowedTabIds.includes('ner') && (
           <>
             <div className="main-grid">
               <InputPanel
@@ -149,11 +166,11 @@ function App() {
             <SystemStats />
           </>
         )}
-        {tab === 'crawl' && <CrawlPage />}
-        {tab === 'pipeline' && <PipelinePage />}
-        {tab === 'labeling' && <LabelingPage />}
-        {tab === 'review' && <ReviewPage />}
-        {tab === 'users' && <UsersPage />}
+        {tab === 'crawl' && allowedTabIds.includes('crawl') && <CrawlPage />}
+        {tab === 'pipeline' && allowedTabIds.includes('pipeline') && <PipelinePage />}
+        {tab === 'labeling' && allowedTabIds.includes('labeling') && <LabelingPage />}
+        {tab === 'review' && allowedTabIds.includes('review') && <ReviewPage />}
+        {tab === 'users' && allowedTabIds.includes('users') && <UsersPage />}
       </div>
 
       <footer className="site-footer">
