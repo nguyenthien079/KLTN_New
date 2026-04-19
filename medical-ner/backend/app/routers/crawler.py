@@ -130,9 +130,26 @@ async def list_crawl_history():
     return {"jobs": list(crawl_jobs.values())}
 
 
+@router.get("/domains")
+async def list_domains():
+    """List all domains that have stored URL files"""
+    from app.crawler.domain_store import list_domains as _list_domains
+    return {"domains": _list_domains()}
+
+
+@router.get("/domains/{domain}/urls")
+async def get_domain_urls(domain: str):
+    """Get stored URLs for a domain"""
+    from app.crawler.domain_store import load_urls, list_domains as _list_domains
+    if domain not in _list_domains():
+        raise HTTPException(status_code=404, detail=f"Domain '{domain}' not found")
+    return {"domain": domain, "urls": load_urls(domain)}
+
+
 async def run_discovery_job(job_id: str, url: str):
     """Background task that runs site discovery"""
     from app.crawler.discovery import SiteDiscovery
+    from app.crawler.domain_store import normalize_domain, save_urls
 
     try:
         discovery = SiteDiscovery()
@@ -142,6 +159,9 @@ async def run_discovery_job(job_id: str, url: str):
             discovery_jobs[job_id]["logs"].append(f"[{count}] {found_url}")
 
         urls = await discovery.discover(url, on_progress=progress_callback)
+
+        domain = normalize_domain(url)
+        save_urls(domain, urls)
 
         discovery_jobs[job_id]["status"] = "completed"
         discovery_jobs[job_id]["url_count"] = len(urls)

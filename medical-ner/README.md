@@ -12,6 +12,8 @@ Hệ thống nhận diện thực thể y tế tiếng Việt (Named Entity Reco
 - [ML Pipeline](#-ml-pipeline)
 - [Workflow](#-workflow)
 - [Setup & Installation](#-setup--installation)
+- [Chạy Backend](#-chạy-backend)
+- [Crawler & Site Discovery](#-crawler--site-discovery)
 - [Key Insights](#-key-insights)
 
 ---
@@ -1231,6 +1233,10 @@ python scripts/migrate_add_auth_columns.py
 #   - label_annotations
 python scripts/migrate_labeling_tables.py
 
+# [NEW] Migrate: tạo bảng discovered_domains và discovered_urls
+alembic revision --autogenerate -m "add discovered domains and urls tables"
+alembic upgrade head
+
 # [NEW] Seed tài khoản admin mặc định (admin / admin123)
 python scripts/seed_admin.py
 
@@ -1275,6 +1281,303 @@ docker-compose up -d
 # - backend: localhost:8000
 # - frontend: localhost:3000
 # - postgres: localhost:5432
+```
+
+---
+
+## 🚦 Chạy Backend
+
+### Chạy thường (development)
+
+```bash
+cd backend
+source venv/bin/activate        # Windows: venv\Scripts\activate
+uvicorn app.main:app --reload --port 8000
+```
+
+Server khởi động tại `http://localhost:8000`. API docs tại `http://localhost:8000/docs`.
+
+---
+
+### Chạy ngầm (background)
+
+#### Linux / macOS
+
+```bash
+cd backend
+source venv/bin/activate
+
+# Dùng nohup — log ghi vào backend.log
+nohup uvicorn app.main:app --port 8000 > backend.log 2>&1 &
+
+# Xem PID vừa tạo
+echo "Backend PID: $!"
+
+# Xem log realtime
+tail -f backend.log
+
+# Dừng server
+kill $(lsof -ti:8000)
+```
+
+Hoặc dùng `screen` để có thể reconnect:
+
+```bash
+screen -S backend
+uvicorn app.main:app --port 8000
+# Ctrl+A D  →  detach (server vẫn chạy)
+
+# Reconnect lại
+screen -r backend
+```
+
+#### Windows
+
+```powershell
+cd backend
+venv\Scripts\activate
+
+# Chạy ngầm qua Start-Process (log ghi vào backend.log)
+Start-Process -NoNewWindow python -ArgumentList "-m uvicorn app.main:app --port 8000" `
+  -RedirectStandardOutput backend.log -RedirectStandardError backend.log
+
+# Dừng server
+Stop-Process -Name python
+```
+
+Hoặc dùng Task Manager → tìm process `python` chạy uvicorn.
+
+---
+
+### Chạy bằng Docker (production)
+
+```bash
+# Từ thư mục gốc dự án
+docker-compose up -d          # khởi động ngầm tất cả services
+
+docker-compose logs -f backend   # xem log backend
+docker-compose stop              # dừng tất cả
+docker-compose down              # dừng + xóa container
+```
+
+Services sau khi up:
+| Service  | URL                    |
+|----------|------------------------|
+| backend  | http://localhost:8000  |
+| frontend | http://localhost:3000  |
+| postgres | localhost:5432         |
+
+---
+
+## 🕷 Crawler & Site Discovery
+
+Hệ thống crawler chạy hoàn toàn ở backend (không trigger từ frontend). Quy trình gồm 2 bước:
+
+```
+discover_sites.py          persist_latest_to_db.py      crawl_from_domain.py
+(tìm URL theo domain)  →   (lưu URL vào PostgreSQL)  →  (crawl nội dung bài viết)
+        ↓                           ↓                            ↓
+data/listsite/{domain}/     discovered_domains /         articles table
+    {domain}.json           discovered_urls tables        (PostgreSQL)
+```
+
+**Nguyên tắc tách biệt:**
+- `discover_sites.py` → chỉ ghi JSON, không đụng DB
+- `persist_latest_to_db.py` → đọc JSON, ghi DB
+- `crawl_from_domain.py` → đọc JSON, crawl nội dung bài viết
+
+---
+
+### Cấu Trúc Lưu Trữ
+
+```
+backend/data/listsite/
+├── suckhoedoisong.vn/
+│   └── suckhoedoisong.vn.json
+├── vinmec.com/
+│   └── vinmec.com.json
+└── hellobacsi.com/
+    └── hellobacsi.com.json
+```
+
+Mỗi file JSON có cấu trúc:
+
+```json
+{
+  "domain": "suckhoedoisong.vn",
+  "urls": [
+    "https://suckhoedoisong.vn/benh-tieu-duong-123.htm",
+    "https://suckhoedoisong.vn/thuoc-ha-sot-456.htm"
+  ]
+}
+```
+
+**Quy tắc:**
+- Mỗi domain có đúng 1 folder và 1 file JSON.
+- Domain được chuẩn hóa: bỏ `www.`, chữ thường. Ví dụ: `https://www.Abc.VN/page` → `abc.vn`.
+- Chạy lại discovery sẽ **merge** URL mới vào file cũ, không ghi đè, không trùng lặp.
+
+---
+
+### Bước 1 — Tìm URL (Site Discovery)
+
+```bash
+cd backend
+source venv/bin/activate   # Windows: venv\Scripts\activate
+
+# Tìm 1 domain
+python scripts/discover_sites.py https://suckhoedoisong.vn
+
+# Tìm nhiều domain cùng lúc (tuần tự, delay 2s giữa các domain)
+python scripts/discover_sites.py \
+  https://suckhoedoisong.vn \
+  https://www.vinmec.com \
+  https://hellobacsi.com
+```
+
+**Output ví dụ:**
+
+```
+============================================================
+Discovering: https://suckhoedoisong.vn  →  domain: suckhoedoisong.vn
+============================================================
+  [1] https://suckhoedoisong.vn/benh-tieu-duong-123.htm
+  [2] https://suckhoedoisong.vn/thuoc-ha-sot-456.htm
+  ...
+
+Saved 842 URLs → data/listsite/suckhoedoisong.vn/suckhoedoisong.vn.json
+```
+
+**Chạy ngầm (ví dụ nhiều site, mất thời gian):**
+
+```bash
+# Linux/macOS
+nohup python scripts/discover_sites.py https://suckhoedoisong.vn > discover.log 2>&1 &
+
+# Xem tiến trình
+tail -f discover.log
+```
+
+---
+
+### Bước 1b — Lưu URL vào PostgreSQL (tùy chọn)
+
+Sau khi discovery xong, chạy lệnh sau để đồng bộ tất cả domain/URL từ JSON vào DB:
+
+```bash
+python scripts/persist_latest_to_db.py
+```
+
+**Output ví dụ:**
+
+```
+Persisting 3 domain(s) to PostgreSQL...
+
+  ✓ suckhoedoisong.vn  (842 URLs)
+  ✓ vinmec.com         (317 URLs)
+  ✓ hellobacsi.com     (521 URLs)
+
+Done. 3 domain(s) persisted.
+```
+
+> Script này dùng `ON CONFLICT DO NOTHING` — an toàn khi chạy nhiều lần, không ghi đè dữ liệu cũ.
+
+---
+
+### Bước 2 — Crawl Nội Dung
+
+```bash
+# Liệt kê các domain đã có URL
+python scripts/crawl_from_domain.py --list
+
+# Output:
+# Available domains:
+#   suckhoedoisong.vn  (842 URLs)
+#   vinmec.com         (317 URLs)
+#   hellobacsi.com     (521 URLs)
+
+# Crawl một domain
+python scripts/crawl_from_domain.py suckhoedoisong.vn
+```
+
+**Output ví dụ:**
+
+```
+============================================================
+Crawling domain: suckhoedoisong.vn  (842 URLs)
+============================================================
+
+  [1/842] ✓ https://suckhoedoisong.vn/benh-tieu-duong.htm — Bệnh tiểu đường type 2
+  [2/842] — SKIP https://suckhoedoisong.vn/...  (too short)
+  [3/842] ✗ FAIL https://suckhoedoisong.vn/...
+  ...
+
+Done. Saved 731 new articles for suckhoedoisong.vn.
+```
+
+**Chạy ngầm:**
+
+```bash
+# Linux/macOS
+nohup python scripts/crawl_from_domain.py suckhoedoisong.vn > crawl_skds.log 2>&1 &
+tail -f crawl_skds.log
+```
+
+---
+
+### API Endpoints (Backend)
+
+Ngoài CLI, backend cũng expose các endpoint để đọc dữ liệu domain:
+
+| Method | Endpoint                           | Mô tả                              |
+|--------|------------------------------------|------------------------------------|
+| GET    | `/api/crawl/domains`               | Danh sách tất cả domain đã có file |
+| GET    | `/api/crawl/domains/{domain}/urls` | Lấy danh sách URL của một domain   |
+| POST   | `/api/crawl/discover`              | Trigger discovery qua API          |
+| GET    | `/api/crawl/discover/{job_id}`     | Theo dõi tiến trình discovery      |
+| POST   | `/api/crawl/start`                 | Trigger crawl qua API              |
+| GET    | `/api/crawl/status/{job_id}`       | Theo dõi tiến trình crawl          |
+
+Ví dụ:
+
+```bash
+# Lấy danh sách domain
+curl http://localhost:8000/api/crawl/domains
+
+# Lấy URL của một domain
+curl http://localhost:8000/api/crawl/domains/suckhoedoisong.vn/urls
+```
+
+---
+
+### Quy Trình Đầy Đủ
+
+```bash
+cd backend
+source venv/bin/activate
+
+# 1. Khởi động backend (cần cho bước crawl vì dùng database)
+uvicorn app.main:app --port 8000 &
+
+# 2. Tìm URL cho các domain (lưu vào JSON)
+python scripts/discover_sites.py \
+  https://suckhoedoisong.vn \
+  https://www.vinmec.com \
+  https://hellobacsi.com
+
+# 3. (Tùy chọn) Đồng bộ URL vào PostgreSQL
+python scripts/persist_latest_to_db.py
+
+# 4. Kiểm tra kết quả
+python scripts/crawl_from_domain.py --list
+
+# 5. Crawl từng domain (bài viết lưu vào PostgreSQL)
+python scripts/crawl_from_domain.py suckhoedoisong.vn
+python scripts/crawl_from_domain.py vinmec.com
+python scripts/crawl_from_domain.py hellobacsi.com
+
+# 6. Tiếp tục pipeline xử lý dữ liệu
+python scripts/run_pipeline.py
 ```
 
 ---

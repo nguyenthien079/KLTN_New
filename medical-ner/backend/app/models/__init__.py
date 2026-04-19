@@ -9,6 +9,7 @@ from app.models.role_request import RoleRequest
 from app.models.label_assignment import LabelAssignment
 from app.models.label_submission import LabelSubmission
 from app.models.label_annotation import LabelAnnotation
+from app.models.discovered_url import DiscoveredDomain, DiscoveredUrl
 
 __all__ = [
     "Base",
@@ -25,4 +26,6 @@ __all__ = [
     "LabelAssignment",
     "LabelSubmission",
     "LabelAnnotation",
+    "DiscoveredDomain",
+    "DiscoveredUrl",
 ]
