@@ -293,6 +293,39 @@ async def assign_article(
     return {"status": "assigned"}
 
 
+@router.get("/articles/{article_id}/suggest")
+async def suggest_annotations(
+    article_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_expert_or_admin),
+):
+    """Expert/Admin: auto-suggest annotations for an article using rule-based + dictionary NER."""
+    article = await db.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
+
+    text = article.clean_text or ""
+    if not text.strip():
+        return {"article_id": article_id, "suggestions": []}
+
+    from app.ner.pipeline import run
+    spans = run(text)
+
+    return {
+        "article_id": article_id,
+        "suggestions": [
+            {
+                "entity_type": s["label"],
+                "start_offset": s["start"],
+                "end_offset": s["end"],
+                "surface_text": s["text"],
+                "source": s["source"],
+            }
+            for s in spans
+        ],
+    }
+
+
 @router.get("/articles/{article_id}/export")
 async def export_article_annotations(
     article_id: int,
