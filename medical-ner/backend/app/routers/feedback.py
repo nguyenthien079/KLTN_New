@@ -215,19 +215,30 @@ def convert_to_bio(correction_id: str, text: str, entities: List[dict]) -> BIOTo
     Returns:
         BIOToken with tokens and BIO tags
     """
-    # Simple tokenization by splitting on whitespace
-    # In production, use proper Vietnamese tokenizer (underthesea)
-    tokens = text.split()
-    tags = ["O"] * len(tokens)
-    
-    # Calculate character position for each token
-    char_positions = []
+    try:
+        from underthesea import word_tokenize as _wt
+        raw_tokens = _wt(text)
+    except Exception:
+        raw_tokens = text.split()
+
+    # underthesea joins multi-syllable words with "_"; map back to original text
+    tokens: list[str] = []
+    char_positions: list[tuple[int, int]] = []
     current_pos = 0
-    for token in tokens:
-        start_pos = text.find(token, current_pos)
-        end_pos = start_pos + len(token)
+    for raw in raw_tokens:
+        surface = raw.replace("_", " ")
+        start_pos = text.find(surface, current_pos)
+        if start_pos == -1:
+            start_pos = text.find(raw, current_pos)
+            surface = raw
+        if start_pos == -1:
+            continue
+        end_pos = start_pos + len(surface)
+        tokens.append(surface)
         char_positions.append((start_pos, end_pos))
         current_pos = end_pos
+
+    tags = ["O"] * len(tokens)
     
     # Assign BIO tags based on entity positions
     for entity in entities:

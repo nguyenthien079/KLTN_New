@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -13,6 +13,7 @@ class LabelSubmission(Base):
     article_id = Column(Integer, ForeignKey("articles.id"), nullable=False, index=True)
     labeler_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     status = Column(String(20), nullable=False, default="draft")  # draft | submitted
+    model_predictions = Column(JSON, nullable=True)  # NER snapshot at annotation start
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

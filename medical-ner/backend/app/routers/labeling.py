@@ -232,7 +232,23 @@ async def save_submission(
     sub = sub_result.scalar_one_or_none()
 
     if sub is None:
-        sub = LabelSubmission(article_id=article_id, labeler_id=user.id)
+        # Snapshot model predictions once at session start
+        predictions = []
+        article = await db.get(Article, article_id)
+        if article and article.clean_text and article.clean_text.strip():
+            try:
+                from app.routers.ner import get_ner_pipeline
+                import asyncio
+                pipeline = get_ner_pipeline()
+                loop = asyncio.get_event_loop()
+                entities = await loop.run_in_executor(None, pipeline.extract, article.clean_text)
+                predictions = [
+                    {"text": e.text, "type": e.entity_type, "start": e.start, "end": e.end, "source": e.source}
+                    for e in entities
+                ]
+            except Exception:
+                pass
+        sub = LabelSubmission(article_id=article_id, labeler_id=user.id, model_predictions=predictions)
         db.add(sub)
         await db.flush()
     elif sub.status == "submitted" and not request.submit:
@@ -468,7 +484,7 @@ async def get_label_review_queue(
             article_id=sub.article_id,
             article_title=article.title if article else None,
             original_text=article.clean_text if article and article.clean_text else "",
-            original_entities=[],
+            original_entities=sub.model_predictions or [],
             corrected_entities=[
                 {
                     "text": ann.surface_text or "",

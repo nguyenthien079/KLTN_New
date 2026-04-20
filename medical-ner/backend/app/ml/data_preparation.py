@@ -45,7 +45,12 @@ class DataPreparator:
 
     def label_sentence(self, text: str) -> Tuple[List[str], List[str]]:
         """Label a sentence with BIO tags using dictionary matching"""
-        tokens = text.split()
+        try:
+            from underthesea import word_tokenize as _wt
+            raw = _wt(text)
+            tokens = [t.replace("_", " ") for t in raw]
+        except Exception:
+            tokens = text.split()
         tags = ['O'] * len(tokens)
         text_lower = text.lower()
 
