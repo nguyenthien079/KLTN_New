@@ -7,21 +7,8 @@ import './AnnotationView.css';
 const ENTITY_TYPES = Object.keys(ENTITY_COLORS);
 
 // ── Helper: render text with annotation highlights ─────────────────────────
-function AnnotatedText({ text, myAnnotations, othersAnnotations, onRemove }) {
-  // Build segments from offsets
-  // Collect all boundaries, sort, slice text
-  const events = [];
-  myAnnotations.forEach((ann, idx) => {
-    events.push({ pos: ann.start_offset, type: 'open', kind: 'mine', idx, ann });
-    events.push({ pos: ann.end_offset, type: 'close', kind: 'mine', idx });
-  });
-  othersAnnotations.forEach((ann, idx) => {
-    events.push({ pos: ann.start_offset, type: 'open', kind: 'other', idx, ann });
-    events.push({ pos: ann.end_offset, type: 'close', kind: 'other', idx });
-  });
-
-  // Simple segment-based render: split text at all event positions
-  const positions = [...new Set([0, ...events.map((e) => e.pos), text.length])].sort(
+function AnnotatedText({ text, annotations, onEdit }) {
+  const positions = [...new Set([0, ...annotations.flatMap((a) => [a.start_offset, a.end_offset]), text.length])].sort(
     (a, b) => a - b
   );
 
@@ -32,19 +19,11 @@ function AnnotatedText({ text, myAnnotations, othersAnnotations, onRemove }) {
     if (start >= end) continue;
 
     const chunk = text.slice(start, end);
+    const ann = annotations.find((a) => a.start_offset <= start && a.end_offset >= end);
 
-    // Find any open mine annotation covering this segment
-    const mineAnn = myAnnotations.find(
-      (a) => a.start_offset <= start && a.end_offset >= end
-    );
-    // Find any open other annotation covering this segment
-    const otherAnn = othersAnnotations.find(
-      (a) => a.start_offset <= start && a.end_offset >= end
-    );
-
-    if (mineAnn) {
-      const color = ENTITY_COLORS[mineAnn.entity_type];
-      const mineIdx = myAnnotations.indexOf(mineAnn);
+    if (ann) {
+      const color = ENTITY_COLORS[ann.entity_type];
+      const idx = annotations.indexOf(ann);
       segments.push(
         <mark
           key={`${start}-mine`}
@@ -54,23 +33,8 @@ function AnnotatedText({ text, myAnnotations, othersAnnotations, onRemove }) {
             borderBottomColor: color?.border || '#ca8a04',
             color: color?.text || 'inherit',
           }}
-          title={`${mineAnn.entity_type}${mineAnn.comment ? ' — ' + mineAnn.comment : ''} (click để xóa)`}
-          onClick={() => onRemove(mineIdx)}
-        >
-          {chunk}
-        </mark>
-      );
-    } else if (otherAnn) {
-      const color = ENTITY_COLORS[otherAnn.entity_type];
-      segments.push(
-        <mark
-          key={`${start}-other`}
-          className="av-span-other"
-          style={{
-            background: color?.bg || '#f0f9ff',
-            borderBottomColor: color?.border || '#7dd3fc',
-          }}
-          title={`${otherAnn.labeler_name}: ${otherAnn.entity_type}${otherAnn.comment ? ' — ' + otherAnn.comment : ''}`}
+          title={`${ann.entity_type}${ann.comment ? ' — ' + ann.comment : ''} (click để sửa)`}
+          onClick={() => onEdit(idx)}
         >
           {chunk}
         </mark>
@@ -83,9 +47,14 @@ function AnnotatedText({ text, myAnnotations, othersAnnotations, onRemove }) {
   return <>{segments}</>;
 }
 
-// ── Entity picker popup ────────────────────────────────────────────────────
-function EntityPopup({ popup, onConfirm, onCancel }) {
-  const [comment, setComment] = useState('');
+// ── Entity picker / editor popup ──────────────────────────────────────────
+function EntityPopup({ popup, onConfirm, onDelete, onCancel }) {
+  const [comment, setComment] = useState(popup.comment || '');
+  const isEdit = popup.mode === 'edit';
+
+  useEffect(() => {
+    setComment(popup.comment || '');
+  }, [popup]);
 
   return (
     <div
@@ -96,11 +65,12 @@ function EntityPopup({ popup, onConfirm, onCancel }) {
       <div className="av-popup-types">
         {ENTITY_TYPES.map((type) => {
           const color = ENTITY_COLORS[type];
+          const isActive = isEdit && type === popup.currentType;
           return (
             <button
               key={type}
-              className="av-type-btn"
-              style={{ borderColor: color?.border, color: color?.text, background: color?.bg }}
+              className={`av-type-btn${isActive ? ' av-type-btn--active' : ''}`}
+              style={{ borderColor: color?.border, color: color?.text, background: isActive ? color?.border : color?.bg }}
               onClick={() => onConfirm(type, comment)}
             >
               {color?.label || type}
@@ -116,6 +86,9 @@ function EntityPopup({ popup, onConfirm, onCancel }) {
         onChange={(e) => setComment(e.target.value)}
       />
       <div className="av-popup-actions">
+        {isEdit && (
+          <button className="av-popup-delete" onClick={onDelete}>Xóa</button>
+        )}
         <button className="av-popup-cancel" onClick={onCancel}>Hủy</button>
       </div>
     </div>
@@ -136,9 +109,8 @@ export default function AnnotationView({ articleId, onBack }) {
   const { user } = useAuth();
   const canReview = user.role === 'chuyen_gia' || user.role === 'admin';
   const [article, setArticle] = useState(null);
-  const [submissions, setSubmissions] = useState([]);
   const [myAnnotations, setMyAnnotations] = useState([]);
-  const [popup, setPopup] = useState(null); // {x, y, start, end, text}
+  const [popup, setPopup] = useState(null); // {mode:'add'|'edit', x, y, start, end, text, currentType?, comment?, editIdx?}
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
   const [fetchError, setFetchError] = useState(null);
@@ -150,8 +122,6 @@ export default function AnnotationView({ articleId, onBack }) {
       getArticleSubmissions(articleId),
     ]).then(([art, subs]) => {
       setArticle(art);
-      setSubmissions(subs);
-      // load own draft annotations
       const mine = subs.find((s) => s.labeler_id === user.user_id);
       if (mine) setMyAnnotations(mine.annotations);
     }).catch(() => {
@@ -159,45 +129,78 @@ export default function AnnotationView({ articleId, onBack }) {
     });
   }, [articleId, user.user_id]);
 
+  // U3 fix: check both anchorNode and focusNode; trim-aware offsets
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
-    if (!textRef.current?.contains(sel.anchorNode)) return;
+    if (
+      !textRef.current?.contains(sel.anchorNode) ||
+      !textRef.current?.contains(sel.focusNode)
+    ) return;
 
     const range = sel.getRangeAt(0);
     const rawText = range.toString();
     const text = rawText.trim();
     if (!text) return;
 
-    // Calculate char offsets relative to clean_text
     const beforeRange = document.createRange();
     beforeRange.setStart(textRef.current, 0);
     beforeRange.setEnd(range.startContainer, range.startOffset);
-    const start = beforeRange.toString().length;
-    const end = start + rawText.length;  // use raw (untrimmed) length
+
+    const rawStart = beforeRange.toString().length;
+    const leadingSpaces = rawText.length - rawText.trimStart().length;
+    const start = rawStart + leadingSpaces;
+    const end = start + text.length;
 
     const rect = range.getBoundingClientRect();
-    setPopup({ x: rect.left, y: rect.bottom + 8, start, end, text });
+    setPopup({ mode: 'add', x: rect.left, y: rect.bottom + 8, start, end, text });
     sel.removeAllRanges();
   }, []);
 
-  const handleAddAnnotation = (entityType, comment) => {
+  const handleEditClick = (idx) => {
+    const ann = myAnnotations[idx];
+    setPopup({
+      mode: 'edit',
+      x: 100,
+      y: 80,
+      start: ann.start_offset,
+      end: ann.end_offset,
+      text: ann.surface_text || '',
+      currentType: ann.entity_type,
+      comment: ann.comment || '',
+      editIdx: idx,
+    });
+  };
+
+  const handleConfirm = (entityType, comment) => {
     if (!popup) return;
-    setMyAnnotations((prev) => [
-      ...prev,
-      {
-        entity_type: entityType,
-        start_offset: popup.start,
-        end_offset: popup.end,
-        surface_text: popup.text,
-        comment: comment || null,
-      },
-    ]);
+    if (popup.mode === 'edit') {
+      setMyAnnotations((prev) =>
+        prev.map((ann, i) =>
+          i === popup.editIdx
+            ? { ...ann, entity_type: entityType, comment: comment || null }
+            : ann
+        )
+      );
+    } else {
+      setMyAnnotations((prev) => [
+        ...prev,
+        {
+          entity_type: entityType,
+          start_offset: popup.start,
+          end_offset: popup.end,
+          surface_text: popup.text,
+          comment: comment || null,
+        },
+      ]);
+    }
     setPopup(null);
   };
 
-  const handleRemoveAnnotation = (idx) => {
-    setMyAnnotations((prev) => prev.filter((_, i) => i !== idx));
+  const handleDeleteAnnotation = () => {
+    if (!popup || popup.editIdx == null) return;
+    setMyAnnotations((prev) => prev.filter((_, i) => i !== popup.editIdx));
+    setPopup(null);
   };
 
   const handleSave = async (submit = false) => {
@@ -206,10 +209,6 @@ export default function AnnotationView({ articleId, onBack }) {
       await saveSubmission(articleId, myAnnotations, submit);
       setSaveMsg(submit ? 'Đã nộp!' : 'Đã lưu nháp.');
       setTimeout(() => setSaveMsg(null), 2000);
-      if (submit) {
-        const subs = await getArticleSubmissions(articleId);
-        setSubmissions(subs);
-      }
     } catch {
       setSaveMsg('Lỗi lưu.');
       setTimeout(() => setSaveMsg(null), 2000);
@@ -221,21 +220,16 @@ export default function AnnotationView({ articleId, onBack }) {
   const handleCompleteReview = async () => {
     setSaving(true);
     try {
-      // save expert's own annotations as submitted
       await saveSubmission(articleId, myAnnotations, true);
 
-      // download JSON export
       const jsonResp = await exportArticleAnnotations(articleId, 'json');
       downloadBlob(jsonResp.data, `article_${articleId}_annotations.json`);
 
-      // download CSV export
       const csvResp = await exportArticleAnnotations(articleId, 'csv');
       downloadBlob(csvResp.data, `article_${articleId}_annotations.csv`);
 
       setSaveMsg('Đã hoàn thành review. Đang tải xuống file...');
       setTimeout(() => setSaveMsg(null), 3000);
-      const subs = await getArticleSubmissions(articleId);
-      setSubmissions(subs);
     } catch {
       setSaveMsg('Lỗi khi hoàn thành review.');
       setTimeout(() => setSaveMsg(null), 2000);
@@ -244,12 +238,8 @@ export default function AnnotationView({ articleId, onBack }) {
     }
   };
 
-  if (!article) return <div className="av-loading">Đang tải...</div>;
   if (fetchError) return <div className="av-loading">{fetchError}</div>;
-
-  const othersAnnotations = submissions
-    .filter((s) => s.labeler_id !== user.user_id)
-    .flatMap((s) => s.annotations.map((a) => ({ ...a, labeler_name: s.labeler_name })));
+  if (!article) return <div className="av-loading">Đang tải...</div>;
 
   return (
     <div className="av-page">
@@ -262,9 +252,8 @@ export default function AnnotationView({ articleId, onBack }) {
         <div ref={textRef} className="av-text-content">
           <AnnotatedText
             text={article.clean_text}
-            myAnnotations={myAnnotations}
-            othersAnnotations={othersAnnotations}
-            onRemove={handleRemoveAnnotation}
+            annotations={myAnnotations}
+            onEdit={handleEditClick}
           />
         </div>
       </div>
@@ -272,7 +261,8 @@ export default function AnnotationView({ articleId, onBack }) {
       {popup && (
         <EntityPopup
           popup={popup}
-          onConfirm={handleAddAnnotation}
+          onConfirm={handleConfirm}
+          onDelete={handleDeleteAnnotation}
           onCancel={() => setPopup(null)}
         />
       )}

@@ -171,6 +171,21 @@
   border: 1px solid var(--color-border);
 }
 
+.labeling-btn--annotate {
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.labeling-btn--annotate:hover { opacity: 0.85; }
+
+.labeling-action-cell { white-space: nowrap; }
+
 .labeling-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;

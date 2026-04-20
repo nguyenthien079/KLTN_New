@@ -9,7 +9,7 @@ class RoleRequest(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
-    requested_role = Column(String(20), nullable=False, default="chuyen_gia")
+    requested_role = Column(String(20), nullable=False, default="admin")
     status = Column(String(20), nullable=False, default="pending")  # pending/approved/rejected
     reviewed_by = Column(String(36), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

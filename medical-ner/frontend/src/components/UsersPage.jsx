@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { getUsers, createUser, updateUser, deleteUser, getRoleRequests, approveRoleRequest, rejectRoleRequest } from '../services/api';
 import './UsersPage.css';
 
-const ROLE_LABEL = { admin: 'Admin', chuyen_gia: 'Chuyên gia', labeler: 'Labeler' };
+const ROLE_LABEL = { admin: 'Admin', chuyen_gia: 'Chuyên gia' };
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [form, setForm] = useState({ username: '', password: '', display_name: '', role: 'labeler' });
+  const [form, setForm] = useState({ username: '', password: '', display_name: '', role: 'chuyen_gia' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [roleRequests, setRoleRequests] = useState([]);

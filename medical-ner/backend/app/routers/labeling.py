@@ -16,7 +16,7 @@ from app.models.article import Article
 from app.models.label_assignment import LabelAssignment
 from app.models.label_submission import LabelSubmission
 from app.models.label_annotation import LabelAnnotation
-from app.auth import get_current_user, require_expert_or_admin
+from app.auth import get_current_user
 
 router = APIRouter()
 
@@ -166,7 +166,7 @@ async def get_article_submissions(
     """
     # Check blind mode for this user on this article
     blind = False
-    if user.role == "labeler":
+    if user.role == "chuyen_gia":
         assign = await db.execute(
             select(LabelAssignment)
             .where(LabelAssignment.article_id == article_id)
@@ -265,7 +265,7 @@ async def save_submission(
 async def assign_article(
     request: AssignRequest,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_expert_or_admin),
+    user: User = Depends(get_current_user),
 ):
     """Admin or expert assigns an article to a labeler."""
     existing = await db.execute(
@@ -297,9 +297,9 @@ async def assign_article(
 async def suggest_annotations(
     article_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_expert_or_admin),
+    _: User = Depends(get_current_user),
 ):
-    """Expert/Admin: auto-suggest annotations for an article using rule-based + dictionary NER."""
+    """Auto-suggest annotations using full ensemble NER (PhoBERT + dictionary + rules)."""
     article = await db.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
@@ -308,20 +308,23 @@ async def suggest_annotations(
     if not text.strip():
         return {"article_id": article_id, "suggestions": []}
 
-    from app.ner.pipeline import run
-    spans = run(text)
+    from app.routers.ner import get_ner_pipeline
+    import asyncio
+    pipeline = get_ner_pipeline()
+    loop = asyncio.get_event_loop()
+    entities = await loop.run_in_executor(None, pipeline.extract, text)
 
     return {
         "article_id": article_id,
         "suggestions": [
             {
-                "entity_type": s["label"],
-                "start_offset": s["start"],
-                "end_offset": s["end"],
-                "surface_text": s["text"],
-                "source": s["source"],
+                "entity_type": e.entity_type,
+                "start_offset": e.start,
+                "end_offset": e.end,
+                "surface_text": e.text,
+                "source": e.source,
             }
-            for s in spans
+            for e in entities
         ],
     }
 
@@ -331,7 +334,7 @@ async def export_article_annotations(
     article_id: int,
     format: str = Query("json", pattern="^(json|csv)$"),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_expert_or_admin),
+    user: User = Depends(get_current_user),
 ):
     """Export all submitted annotations for an article as JSON or CSV.
     Only submitted annotations are included. Requires expert or admin role.
@@ -418,7 +421,7 @@ async def toggle_blind_mode(
     assignment_id: str,
     body: BlindModeRequest,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_expert_or_admin),
+    _: User = Depends(get_current_user),
 ):
     """Toggle blind mode for a specific assignment."""
     a = await db.get(LabelAssignment, assignment_id)
@@ -432,7 +435,7 @@ async def toggle_blind_mode(
 @router.get("/review/queue", response_model=list[ReviewQueueItem])
 async def get_label_review_queue(
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_expert_or_admin),
+    _: User = Depends(get_current_user),
 ):
     """Expert/Admin: list submitted and reviewed label submissions."""
     result = await db.execute(
@@ -487,7 +490,7 @@ async def get_label_review_queue(
 async def confirm_label_submission(
     submission_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_expert_or_admin),
+    _: User = Depends(get_current_user),
 ):
     result = await db.execute(select(LabelSubmission).where(LabelSubmission.id == submission_id))
     sub = result.scalar_one_or_none()
@@ -502,7 +505,7 @@ async def confirm_label_submission(
 async def reject_label_submission(
     submission_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_expert_or_admin),
+    _: User = Depends(get_current_user),
 ):
     result = await db.execute(select(LabelSubmission).where(LabelSubmission.id == submission_id))
     sub = result.scalar_one_or_none()

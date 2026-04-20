@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getArticleSubmissions, getLabelingArticle, getLabelingArticles, saveSubmission } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { ENTITY_COLORS } from '../config/entityColors';
+import AnnotationView from './AnnotationView';
 import './LabelingPage.css';
 
 const ENTITY_TYPES = Object.keys(ENTITY_COLORS);
@@ -139,6 +140,7 @@ export default function LabelingPage() {
   const { user } = useAuth();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedArticleId, setSelectedArticleId] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [openedIds, setOpenedIds] = useState([]);
   const [articleDetails, setArticleDetails] = useState({});
@@ -287,6 +289,15 @@ export default function LabelingPage() {
     return grouped;
   }, [articleDetails, annotationsByArticle, openedIds]);
 
+  if (selectedArticleId != null) {
+    return (
+      <AnnotationView
+        articleId={selectedArticleId}
+        onBack={() => setSelectedArticleId(null)}
+      />
+    );
+  }
+
   return (
     <div className="labeling-page">
       <div className="labeling-header">
@@ -312,6 +323,7 @@ export default function LabelingPage() {
                   <th>Tiêu đề / URL</th>
                   <th>Labelers</th>
                   <th>Trạng thái của bạn</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -343,6 +355,14 @@ export default function LabelingPage() {
                         ) : (
                           <span className="labeling-status labeling-status--none">Chưa làm</span>
                         )}
+                      </td>
+                      <td className="labeling-action-cell">
+                        <button
+                          className="labeling-btn labeling-btn--annotate"
+                          onClick={() => setSelectedArticleId(a.article_id)}
+                        >
+                          Gán nhãn
+                        </button>
                       </td>
                     </tr>
                   );

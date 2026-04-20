@@ -21,7 +21,7 @@ class CreateUserRequest(BaseModel):
     username: str
     password: str
     display_name: str | None = None
-    role: str = "labeler"
+    role: str = "chuyen_gia"
 
 
 class UpdateUserRequest(BaseModel):
@@ -58,8 +58,8 @@ async def create_user(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Tên đăng nhập đã tồn tại")
 
-    if request.role not in ("admin", "labeler", "chuyen_gia"):
-        raise HTTPException(status_code=400, detail="Role phải là admin, chuyen_gia hoặc labeler")
+    if request.role not in ("admin", "chuyen_gia"):
+        raise HTTPException(status_code=400, detail="Role phải là admin hoặc chuyen_gia")
 
     user = User(
         username=request.username,
@@ -90,8 +90,8 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
 
-    if request.role is not None and request.role not in ("admin", "labeler", "chuyen_gia"):
-        raise HTTPException(status_code=400, detail="Role phải là admin, chuyen_gia hoặc labeler")
+    if request.role is not None and request.role not in ("admin", "chuyen_gia"):
+        raise HTTPException(status_code=400, detail="Role phải là admin hoặc chuyen_gia")
 
     if request.role is not None:
         # Prevent removing own admin role.

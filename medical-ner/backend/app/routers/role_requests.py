@@ -27,9 +27,9 @@ async def request_role_upgrade(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Labeler requests upgrade to chuyen_gia."""
-    if user.role != "labeler":
-        raise HTTPException(status_code=400, detail="Chỉ labeler mới có thể xin nâng quyền")
+    """chuyen_gia requests upgrade to admin."""
+    if user.role != "chuyen_gia":
+        raise HTTPException(status_code=400, detail="Chỉ chuyên gia mới có thể xin nâng quyền lên admin")
 
     # Check existing pending request
     existing = await db.execute(
@@ -40,7 +40,7 @@ async def request_role_upgrade(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Đã có yêu cầu đang chờ duyệt")
 
-    req = RoleRequest(user_id=user.id, requested_role="chuyen_gia")
+    req = RoleRequest(user_id=user.id, requested_role="admin")
     db.add(req)
     await db.commit()
     return {"message": "Đã gửi yêu cầu nâng quyền"}

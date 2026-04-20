@@ -61,7 +61,3 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-def require_expert_or_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role not in ("admin", "chuyen_gia"):
-        raise HTTPException(status_code=403, detail="Yêu cầu quyền chuyên gia trở lên")
-    return user

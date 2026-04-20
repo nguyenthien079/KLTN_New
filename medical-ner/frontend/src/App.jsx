@@ -40,16 +40,13 @@ function App() {
   };
 
   const roleTabConfig = useMemo(() => {
-    if (role === 'labeler') {
+    if (role === 'chuyen_gia') {
       return [
         { id: 'ner', label: 'Phân tích NER' },
         { id: 'crawl', label: 'Thu thập dữ liệu' },
         { id: 'pipeline', label: 'Pipeline' },
         { id: 'labeling', label: 'Labeling' },
       ];
-    }
-    if (role === 'chuyen_gia') {
-      return [{ id: 'labeling', label: 'Labeling' }];
     }
     if (role === 'admin') {
       return [
@@ -59,7 +56,12 @@ function App() {
         { id: 'users', label: 'Quản lý user' },
       ];
     }
-    return [{ id: 'labeling', label: 'Labeling' }];
+    return [
+      { id: 'ner', label: 'Phân tích NER' },
+      { id: 'crawl', label: 'Thu thập dữ liệu' },
+      { id: 'pipeline', label: 'Pipeline' },
+      { id: 'labeling', label: 'Labeling' },
+    ];
   }, [role]);
 
   const allowedTabIds = useMemo(() => roleTabConfig.map((t) => t.id), [roleTabConfig]);
@@ -133,11 +135,11 @@ function App() {
             </button>
           ))}
           <div className="tab-nav-user">
-            {user.role === 'labeler' && (
+            {user.role === 'chuyen_gia' && (
               <>
                 {upgradeMsg && <span className="tab-nav-upgrade-msg">{upgradeMsg}</span>}
                 <button className="tab-nav-upgrade-btn" onClick={handleRequestUpgrade}>
-                  Xin Cấp Quyền
+                  Xin Cấp Quyền Admin
                 </button>
               </>
             )}

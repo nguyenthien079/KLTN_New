@@ -109,13 +109,6 @@
 
 .av-span-mine:hover { opacity: 0.8; }
 
-.av-span-other {
-  border-radius: 3px;
-  padding: 1px 0;
-  opacity: 0.4;
-  border-bottom: 2px dashed;
-  cursor: default;
-}
 
 /* Entity popup */
 .av-popup {
@@ -156,6 +149,12 @@
   cursor: pointer;
 }
 
+.av-type-btn--active {
+  box-shadow: 0 0 0 2px currentColor;
+  opacity: 1;
+  font-weight: 700;
+}
+
 .av-popup-comment {
   width: 100%;
   padding: 6px 8px;
@@ -174,6 +173,18 @@
 .av-popup-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+.av-popup-delete {
+  padding: 5px 12px;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: #dc2626;
+  margin-right: auto;
 }
 
 .av-popup-cancel {
