@@ -43,8 +43,6 @@ function App() {
     if (role === 'chuyen_gia') {
       return [
         { id: 'ner', label: 'Phân tích NER' },
-        { id: 'crawl', label: 'Thu thập dữ liệu' },
-        { id: 'pipeline', label: 'Pipeline' },
         { id: 'labeling', label: 'Labeling' },
       ];
     }
@@ -58,8 +56,6 @@ function App() {
     }
     return [
       { id: 'ner', label: 'Phân tích NER' },
-      { id: 'crawl', label: 'Thu thập dữ liệu' },
-      { id: 'pipeline', label: 'Pipeline' },
       { id: 'labeling', label: 'Labeling' },
     ];
   }, [role]);
