@@ -2,6 +2,7 @@
 import csv
 import io
 import json as json_lib
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -16,7 +17,21 @@ from app.models.article import Article
 from app.models.label_assignment import LabelAssignment
 from app.models.label_submission import LabelSubmission
 from app.models.label_annotation import LabelAnnotation
+from app.models.entity import Entity, EntityType
 from app.auth import get_current_user
+
+_DATA_DIR = Path(__file__).parent.parent.parent / "data"
+_DICT_DIR = _DATA_DIR / "dicts"
+_TRAINING_QUEUE_FILE = _DATA_DIR / "training_queue.jsonl"
+
+_ENTITY_TYPE_TO_DICT: dict[str, str] = {
+    "DISEASE": "diseases.txt",
+    "DRUG": "drugs.txt",
+    "SYMPTOM": "symptoms.txt",
+    "TREATMENT": "treatments.txt",
+    "BODY_PART": "body_parts.txt",
+    "TEST": "tests.txt",
+}
 
 router = APIRouter()
 
@@ -240,7 +255,7 @@ async def save_submission(
                 from app.routers.ner import get_ner_pipeline
                 import asyncio
                 pipeline = get_ner_pipeline()
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 entities = await loop.run_in_executor(None, pipeline.extract, article.clean_text)
                 predictions = [
                     {"text": e.text, "type": e.entity_type, "start": e.start, "end": e.end, "source": e.source}
@@ -508,13 +523,91 @@ async def confirm_label_submission(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(LabelSubmission).where(LabelSubmission.id == submission_id))
+    result = await db.execute(
+        select(LabelSubmission)
+        .where(LabelSubmission.id == submission_id)
+        .options(selectinload(LabelSubmission.annotations))
+    )
     sub = result.scalar_one_or_none()
     if not sub:
         raise HTTPException(status_code=404, detail="Không tìm thấy submission")
     sub.status = "confirmed"
+
+    annotations = sub.annotations or []
+    if annotations:
+        await _expand_dicts(annotations)
+        await _append_training_queue(sub, annotations)
+        await _upsert_entities(db, sub.article_id, annotations)
+
     await db.commit()
     return {"id": submission_id, "status": "confirmed"}
+
+
+async def _expand_dicts(annotations: list[LabelAnnotation]) -> None:
+    """A2: append new surface_text to the relevant dictionary file."""
+    for ann in annotations:
+        if not ann.surface_text:
+            continue
+        dict_file = _DICT_DIR / _ENTITY_TYPE_TO_DICT.get(ann.entity_type.upper(), "")
+        if not dict_file.name or not dict_file.exists():
+            continue
+        term = ann.surface_text.strip().lower()
+        existing = {line.strip().lower() for line in dict_file.read_text(encoding="utf-8").splitlines() if line.strip()}
+        if term not in existing:
+            with dict_file.open("a", encoding="utf-8") as f:
+                f.write(f"\n{term}")
+
+
+async def _append_training_queue(sub: LabelSubmission, annotations: list[LabelAnnotation]) -> None:
+    """A2: write confirmed annotations to training queue for future fine-tuning."""
+    entry = {
+        "submission_id": sub.id,
+        "article_id": sub.article_id,
+        "labeler_id": sub.labeler_id,
+        "annotations": [
+            {
+                "entity_type": a.entity_type,
+                "start_offset": a.start_offset,
+                "end_offset": a.end_offset,
+                "surface_text": a.surface_text,
+            }
+            for a in annotations
+        ],
+    }
+    _TRAINING_QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with _TRAINING_QUEUE_FILE.open("a", encoding="utf-8") as f:
+        f.write(json_lib.dumps(entry, ensure_ascii=False) + "\n")
+
+
+async def _upsert_entities(db: AsyncSession, article_id: int, annotations: list[LabelAnnotation]) -> None:
+    """A5: upsert confirmed human annotations into the Entity table."""
+    for ann in annotations:
+        if not ann.surface_text:
+            continue
+        raw_type = ann.entity_type.upper()
+        try:
+            etype = EntityType(raw_type)
+        except ValueError:
+            continue
+
+        normalized = ann.surface_text.strip().lower()
+        result = await db.execute(
+            select(Entity).where(
+                Entity.normalized_text == normalized,
+                Entity.entity_type == etype,
+            )
+        )
+        entity = result.scalar_one_or_none()
+        if entity:
+            entity.frequency = (entity.frequency or 1) + 1
+        else:
+            db.add(Entity(
+                text=ann.surface_text.strip(),
+                normalized_text=normalized,
+                entity_type=etype,
+                frequency=1,
+                avg_confidence=1.0,
+            ))
 
 
 @router.patch("/review/{submission_id}/reject")

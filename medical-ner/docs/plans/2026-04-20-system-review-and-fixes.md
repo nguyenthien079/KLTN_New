@@ -199,9 +199,9 @@ Phase 2 — Sửa data layer  ✅ DONE (commit pending)
         + migration: a1b2c3d4e5f6_add_model_predictions_to_label_submissions.py
   A1  ❌ Unified annotation table — schema refactor lớn, dời sang sau
 
-Phase 3 — Feedback loop
-  A2  ❌ Implement feedback contract (dict expansion + training queue)
-  A5  ❌ Reconcile Entity table với confirmed LabelAnnotation
+Phase 3 — Feedback loop  ✅ DONE (commit pending)
+  A2  ✅ Feedback contract: dict expansion + training_queue.jsonl on confirm
+  A5  ✅ Upsert confirmed annotations into Entity table on confirm
 ```
 
 ---
