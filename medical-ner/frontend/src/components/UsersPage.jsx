@@ -15,7 +15,7 @@ export default function UsersPage() {
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ display_name: '', role: 'labeler', password: '' });
+  const [editForm, setEditForm] = useState({ display_name: '', role: 'chuyen_gia', password: '' });
   const [editError, setEditError] = useState(null);
 
   const load = async () => {
@@ -74,7 +74,7 @@ export default function UsersPage() {
     try {
       const created = await createUser(form);
       setUsers((prev) => [...prev, created]);
-      setForm({ username: '', password: '', display_name: '', role: 'labeler' });
+      setForm({ username: '', password: '', display_name: '', role: 'chuyen_gia' });
     } catch (err) {
       setCreateError(err.response?.data?.detail || 'Tạo thất bại.');
     } finally {
@@ -161,7 +161,6 @@ export default function UsersPage() {
                         value={editForm.role}
                         onChange={(e) => setEditForm((prev) => ({ ...prev, role: e.target.value }))}
                       >
-                        <option value="labeler">Labeler</option>
                         <option value="chuyen_gia">Chuyên gia</option>
                         <option value="admin">Admin</option>
                       </select>
@@ -226,7 +225,6 @@ export default function UsersPage() {
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}
           >
-            <option value="labeler">Labeler</option>
             <option value="chuyen_gia">Chuyên gia</option>
             <option value="admin">Admin</option>
           </select>
