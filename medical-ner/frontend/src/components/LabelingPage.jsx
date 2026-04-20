@@ -241,6 +241,9 @@ export default function LabelingPage() {
     }));
   };
 
+  const refreshArticles = () =>
+    getLabelingArticles().then(setArticles).catch(() => {});
+
   const saveAll = async (submit = false) => {
     if (openedIds.length === 0) return;
     setSaving(true);
@@ -252,6 +255,7 @@ export default function LabelingPage() {
       );
       setSaveMsg(submit ? 'Đã nộp toàn bộ bài đã mở.' : 'Đã lưu nháp toàn bộ bài đã mở.');
       setTimeout(() => setSaveMsg(null), 2200);
+      if (submit) refreshArticles();
     } catch {
       setSaveMsg('Lỗi khi lưu dữ liệu gán nhãn.');
       setTimeout(() => setSaveMsg(null), 2200);
@@ -293,7 +297,7 @@ export default function LabelingPage() {
     return (
       <AnnotationView
         articleId={selectedArticleId}
-        onBack={() => setSelectedArticleId(null)}
+        onBack={() => { setSelectedArticleId(null); refreshArticles(); }}
       />
     );
   }
