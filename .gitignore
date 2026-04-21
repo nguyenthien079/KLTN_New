@@ -1,19 +1,16 @@
-# Specific files to ignore in root
+# ─── Docs / planning (root-level only) ───────────────────────────────────────
 IMPLEMENTATION_SUMMARY.md
+PHASE2_IMPLEMENTATION_SUMMARY.md
 SOFTWARE REQUIREMENT SPECIFICATION.docx
 SOURCE_CODE_ANALYSIS.md
 crawl_plan.md
 plan_coding.md
-
-# Ignore doc files in root
 /*.docx
 /*.doc
-
-# Allow README.md but ignore other MD in root
 /*.md
 !README.md
 
-# Python
+# ─── Python ──────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
@@ -27,30 +24,56 @@ ENV/
 dist/
 build/
 
-# IDE
+# ─── IDE / OS ─────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Node
+# ─── Node ────────────────────────────────────────────────────────────────────
 node_modules/
 .npm
 .next/
 out/
-build/
-dist/
 
-# Env files
+# ─── Secrets & env ───────────────────────────────────────────────────────────
 .env
 .env.local
 .env.*.local
+new/apikey.txt
+**/apikey.txt
 
-# Logs
+# ─── Logs ────────────────────────────────────────────────────────────────────
 *.log
 logs/
+
+# ─── Trained model weights (quá lớn cho git, ~515MB) ─────────────────────────
+# Người clone sẽ tự train lại bằng lệnh bên dưới
+medical-ner/backend/models/phobert-medical/final_model/
+medical-ner/backend/models/phobert-medical/final_model.rar
+medical-ner/backend/models/phobert-medical/checkpoint-*/
+medical-ner/backend/models/phobert-medical/exported/
+medical-ner/backend/models/phobert-medical/logs/
+
+# ─── Data training trung gian (tự sinh ra khi train) ─────────────────────────
+medical-ner/backend/data/training/
+medical-ner/backend/data/evaluation/
+
+# ─── Archives (zip/rar của data — bản gốc đã có trong new/data/) ─────────────
+new/data.rar
+new/Corpus.zip
+new/Corpus_Redone.zip
+
+# ─── Temp / raw corpus files ──────────────────────────────────────────────────
+new/*.pipe
+new/*.text
+new/text.txt
+new/Corpus/
+new/00098-016139.*
+
+# DATA ĐƯỢC GIỮ LẠI (không ignore):
+#   new/data/        → JSON labeled data (~5.3MB) — cần để train
+#   new/Corpus_Redone/ → corpus text (~6.4MB)    — cần để tham khảo
