@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getArticleSubmissions, getLabelingArticle, getLabelingArticles, saveSubmission } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { ENTITY_COLORS } from '../config/entityColors';
-import AnnotationView from './AnnotationView';
 import './LabelingPage.css';
 
 const ENTITY_TYPES = Object.keys(ENTITY_COLORS);
@@ -141,78 +140,76 @@ export default function LabelingPage() {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedArticleId, setSelectedArticleId] = useState(null);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [openedIds, setOpenedIds] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [articleDetails, setArticleDetails] = useState({});
   const [annotationsByArticle, setAnnotationsByArticle] = useState({});
   const [popup, setPopup] = useState(null); // {articleId, x, y, start, end, text}
   const [saveMsg, setSaveMsg] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [loadingArticleId, setLoadingArticleId] = useState(null);
+  const loadedArticleIdsRef = useRef(new Set());
+  const statusFilterRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (statusFilterRef.current && !statusFilterRef.current.contains(event.target)) {
+        setIsStatusFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     getLabelingArticles()
-      .then(setArticles)
+      .then((data) => {
+        setArticles(data);
+        if (data?.length) {
+          setSelectedArticleId((current) => current ?? data[0].article_id);
+        }
+      })
       .catch(() => setArticles([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const toggleArticleSelection = (articleId) => {
-    setSelectedIds((prev) =>
-      prev.includes(articleId) ? prev.filter((id) => id !== articleId) : [...prev, articleId]
-    );
-  };
+  const loadArticle = useCallback(async (articleId) => {
+    setSelectedArticleId(articleId);
 
-  const selectAll = () => {
-    setSelectedIds(articles.map((a) => a.article_id));
-  };
-
-  const clearSelection = () => {
-    setSelectedIds([]);
-  };
-
-  const openSelectedArticles = async () => {
-    if (selectedIds.length === 0) {
-      setSaveMsg('Hãy chọn ít nhất 1 bài để bắt đầu gán nhãn.');
-      setTimeout(() => setSaveMsg(null), 2000);
+    if (loadedArticleIdsRef.current.has(articleId)) {
       return;
     }
 
-    setSaving(true);
+    setLoadingArticleId(articleId);
     try {
-      const payloads = await Promise.all(
-        selectedIds.map(async (articleId) => {
-          const [detail, submissions] = await Promise.all([
-            getLabelingArticle(articleId),
-            getArticleSubmissions(articleId),
-          ]);
-          const mine = submissions.find((s) => s.labeler_id === user.user_id);
-          return {
-            articleId,
-            detail,
-            mineAnnotations: mine?.annotations || [],
-          };
-        })
-      );
+      const [detail, submissions] = await Promise.all([
+        getLabelingArticle(articleId),
+        getArticleSubmissions(articleId),
+      ]);
+      const mine = submissions.find((s) => s.labeler_id === user.user_id);
 
-      const detailsMap = {};
-      const annotationsMap = {};
-      payloads.forEach((item) => {
-        detailsMap[item.articleId] = item.detail;
-        annotationsMap[item.articleId] = item.mineAnnotations;
-      });
-
-      setArticleDetails((prev) => ({ ...prev, ...detailsMap }));
-      setAnnotationsByArticle((prev) => ({ ...prev, ...annotationsMap }));
-      setOpenedIds(selectedIds);
-      setSaveMsg(`Đã mở ${selectedIds.length} bài để gán nhãn.`);
-      setTimeout(() => setSaveMsg(null), 2000);
+      setArticleDetails((prev) => ({
+        ...prev,
+        [articleId]: detail,
+      }));
+      setAnnotationsByArticle((prev) => ({
+        ...prev,
+        [articleId]: mine?.annotations || [],
+      }));
+      loadedArticleIdsRef.current.add(articleId);
     } catch {
-      setSaveMsg('Không thể tải một số bài đã chọn.');
+      setSaveMsg('Không thể tải bài đã chọn.');
       setTimeout(() => setSaveMsg(null), 2000);
     } finally {
-      setSaving(false);
+      setLoadingArticleId(null);
     }
-  };
+  }, [user.user_id]);
+
+  useEffect(() => {
+    if (selectedArticleId != null) {
+      loadArticle(selectedArticleId);
+    }
+  }, [loadArticle, selectedArticleId]);
 
   const handleSelectText = (articleId, pos) => {
     setPopup({ articleId, ...pos });
@@ -244,18 +241,14 @@ export default function LabelingPage() {
   const refreshArticles = () =>
     getLabelingArticles().then(setArticles).catch(() => {});
 
-  const saveAll = async (submit = false) => {
-    if (openedIds.length === 0) return;
+  const saveCurrent = async (submit = false) => {
+    if (selectedArticleId == null) return;
     setSaving(true);
     try {
-      await Promise.all(
-        openedIds.map((articleId) =>
-          saveSubmission(articleId, annotationsByArticle[articleId] || [], submit)
-        )
-      );
-      setSaveMsg(submit ? 'Đã nộp toàn bộ bài đã mở.' : 'Đã lưu nháp toàn bộ bài đã mở.');
+      await saveSubmission(selectedArticleId, annotationsByArticle[selectedArticleId] || [], submit);
+      setSaveMsg(submit ? 'Đã nộp bài đang chọn.' : 'Đã lưu nháp bài đang chọn.');
       setTimeout(() => setSaveMsg(null), 2200);
-      if (submit) refreshArticles();
+      await refreshArticles();
     } catch {
       setSaveMsg('Lỗi khi lưu dữ liệu gán nhãn.');
       setTimeout(() => setSaveMsg(null), 2200);
@@ -271,47 +264,78 @@ export default function LabelingPage() {
     rejected: 'Bị từ chối',
   };
 
+  const FILTER_OPTIONS = [
+    { value: 'all', label: 'Tất cả' },
+    { value: 'draft', label: 'Đang làm' },
+    { value: 'none', label: 'Chưa làm' },
+    { value: 'submitted', label: 'Đã nộp' },
+    { value: 'rejected', label: 'Bị từ chối' },
+    { value: 'confirmed', label: 'Đã duyệt' },
+  ];
+
+  const filteredSortedArticles = useMemo(() => {
+    const getPriority = (status) => {
+      if (status === 'draft') return 0;
+      if (!status) return 1;
+      if (status === 'submitted' || status === 'rejected' || status === 'confirmed') return 2;
+      return 3;
+    };
+
+    return [...articles]
+      .filter((a) => {
+        if (statusFilter === 'all') return true;
+        if (statusFilter === 'none') return !a.my_status;
+        return a.my_status === statusFilter;
+      })
+      .sort((a, b) => {
+      const byStatus = getPriority(a.my_status) - getPriority(b.my_status);
+      if (byStatus !== 0) return byStatus;
+      return a.article_id - b.article_id;
+      });
+  }, [articles, statusFilter]);
+
+  useEffect(() => {
+    if (filteredSortedArticles.length === 0) {
+      setSelectedArticleId(null);
+      return;
+    }
+
+    const stillVisible = filteredSortedArticles.some((a) => a.article_id === selectedArticleId);
+    if (!stillVisible) {
+      setSelectedArticleId(filteredSortedArticles[0].article_id);
+    }
+  }, [filteredSortedArticles, selectedArticleId]);
+
   const groupedTags = useMemo(() => {
     const grouped = {};
     ENTITY_TYPES.forEach((type) => {
       grouped[type] = [];
     });
 
-    openedIds.forEach((articleId) => {
-      const article = articleDetails[articleId];
-      const anns = annotationsByArticle[articleId] || [];
+    if (selectedArticleId != null) {
+      const article = articleDetails[selectedArticleId];
+      const anns = annotationsByArticle[selectedArticleId] || [];
       anns.forEach((ann) => {
         if (!grouped[ann.entity_type]) grouped[ann.entity_type] = [];
         grouped[ann.entity_type].push({
-          articleTitle: article?.title || article?.url || `Bài ${articleId}`,
           text: ann.surface_text || '',
           start: ann.start_offset,
           end: ann.end_offset,
         });
       });
-    });
+    }
     return grouped;
-  }, [articleDetails, annotationsByArticle, openedIds]);
+  }, [articleDetails, annotationsByArticle, selectedArticleId]);
 
-  if (selectedArticleId != null) {
-    return (
-      <AnnotationView
-        articleId={selectedArticleId}
-        onBack={() => { setSelectedArticleId(null); refreshArticles(); }}
-      />
-    );
-  }
+  const selectedArticle = selectedArticleId != null ? articleDetails[selectedArticleId] : null;
+  const selectedAnnotations = selectedArticleId != null ? (annotationsByArticle[selectedArticleId] || []) : [];
 
   return (
     <div className="labeling-page">
       <div className="labeling-header">
         <h2 className="labeling-title">Danh sách bài cần gán nhãn</h2>
         <span className="labeling-count">{articles.length} bài</span>
-        <div className="labeling-actions-inline">
-          <button className="labeling-btn labeling-btn--ghost" onClick={selectAll} disabled={loading || articles.length === 0}>Chọn tất cả</button>
-          <button className="labeling-btn labeling-btn--ghost" onClick={clearSelection} disabled={selectedIds.length === 0}>Bỏ chọn</button>
-          <button className="labeling-btn" onClick={openSelectedArticles} disabled={saving || selectedIds.length === 0}>Mở bài đã chọn</button>
-        </div>
+        {loadingArticleId != null && <span className="labeling-loading">Đang tải bài được chọn...</span>}
       </div>
 
       {loading && <p className="labeling-loading">Đang tải...</p>}
@@ -320,28 +344,64 @@ export default function LabelingPage() {
       <div className="labeling-workspace">
         <div className="labeling-column labeling-column--left">
           <div className="labeling-table-wrap">
-            <table className="labeling-table">
+            <table className={`labeling-table${filteredSortedArticles.length === 0 ? ' labeling-table--empty' : ''}`}>
               <thead>
                 <tr>
-                  <th></th>
                   <th>Tiêu đề / URL</th>
-                  <th>Labelers</th>
-                  <th>Trạng thái của bạn</th>
-                  <th></th>
+                  <th className="labeling-status-header-cell">
+                    <div className="labeling-status-filter" ref={statusFilterRef}>
+                      <button
+                        type="button"
+                        className="labeling-status-filter-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsStatusFilterOpen((prev) => !prev);
+                        }}
+                      >
+                        Trạng thái của bạn
+                        <span className="labeling-status-filter-value">
+                          {FILTER_OPTIONS.find((opt) => opt.value === statusFilter)?.label || 'Tất cả'}
+                        </span>
+                      </button>
+                      {isStatusFilterOpen && (
+                        <div className="labeling-status-filter-menu">
+                          {FILTER_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              className={`labeling-status-filter-item${statusFilter === opt.value ? ' labeling-status-filter-item--active' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setStatusFilter(opt.value);
+                                setIsStatusFilterOpen(false);
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {articles.map((a) => {
-                  const checked = selectedIds.includes(a.article_id);
+                {filteredSortedArticles.map((a) => {
+                  const active = selectedArticleId === a.article_id;
                   return (
-                    <tr key={a.article_id} className={checked ? 'labeling-row--selected' : ''}>
-                      <td className="labeling-checkbox-cell">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleArticleSelection(a.article_id)}
-                        />
-                      </td>
+                    <tr
+                      key={a.article_id}
+                      className={active ? 'labeling-row--selected' : ''}
+                      onClick={() => loadArticle(a.article_id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          loadArticle(a.article_id);
+                        }
+                      }}
+                    >
                       <td className="labeling-title-cell">
                         {a.assigned_to_me && (
                           <span className="labeling-assigned-badge">Được assign</span>
@@ -350,7 +410,6 @@ export default function LabelingPage() {
                           {a.title || a.url}
                         </span>
                       </td>
-                      <td className="labeling-count-cell">{a.submission_count}</td>
                       <td>
                         {a.my_status ? (
                           <span className={`labeling-status labeling-status--${a.my_status}`}>
@@ -360,53 +419,51 @@ export default function LabelingPage() {
                           <span className="labeling-status labeling-status--none">Chưa làm</span>
                         )}
                       </td>
-                      <td className="labeling-action-cell">
-                        <button
-                          className="labeling-btn labeling-btn--annotate"
-                          onClick={() => setSelectedArticleId(a.article_id)}
-                        >
-                          Gán nhãn
-                        </button>
-                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+            {filteredSortedArticles.length === 0 && (
+              <div className="labeling-empty-filter-panel">
+                Không có bài nào ở trạng thái đã chọn.
+              </div>
+            )}
           </div>
         </div>
 
         <div className="labeling-column labeling-column--middle">
           <div className="labeling-batch-toolbar">
-            <span>{openedIds.length} bài đang mở</span>
+            <span>{selectedArticleId != null ? `Bài đang chọn: ${selectedArticle?.title || selectedArticle?.url || `#${selectedArticleId}`}` : 'Chọn một bài bên trái để bắt đầu'}</span>
             <div>
-              <button className="labeling-btn labeling-btn--ghost" onClick={() => saveAll(false)} disabled={saving || openedIds.length === 0}>Lưu nháp tất cả</button>
-              <button className="labeling-btn" onClick={() => saveAll(true)} disabled={saving || openedIds.length === 0}>Nộp tất cả</button>
+              <button className="labeling-btn labeling-btn--ghost" onClick={() => saveCurrent(false)} disabled={saving || selectedArticleId == null}>Lưu nháp</button>
+              <button className="labeling-btn" onClick={() => saveCurrent(true)} disabled={saving || selectedArticleId == null}>Nộp bài</button>
             </div>
           </div>
           <div className="labeling-articles-scroll">
-            {openedIds.length === 0 && (
-              <div className="labeling-empty-panel">Chọn nhiều bài bên trái rồi bấm "Mở bài đã chọn" để bắt đầu gán nhãn.</div>
+            {selectedArticleId == null && (
+              <div className="labeling-empty-panel">Chọn một bài ở danh sách bên trái để xem và gán nhãn.</div>
             )}
-            {openedIds.map((articleId) => {
-              const detail = articleDetails[articleId];
-              if (!detail) return null;
-              return (
-                <ArticleAnnotatorCard
-                  key={articleId}
-                  article={detail}
-                  annotations={annotationsByArticle[articleId] || []}
-                  onSelectText={handleSelectText}
-                  onRemoveAnnotation={(idx) => removeAnnotation(articleId, idx)}
-                />
-              );
-            })}
+            {selectedArticleId != null && !selectedArticle && (
+              <div className="labeling-empty-panel">Đang tải thông tin bài được chọn...</div>
+            )}
+            {selectedArticle && (
+              <ArticleAnnotatorCard
+                article={selectedArticle}
+                annotations={selectedAnnotations}
+                onSelectText={handleSelectText}
+                onRemoveAnnotation={(idx) => removeAnnotation(selectedArticleId, idx)}
+              />
+            )}
           </div>
         </div>
 
         <div className="labeling-column labeling-column--right">
-          <h3 className="labeling-side-title">Danh sách đã gắn tag</h3>
+          <h3 className="labeling-side-title">Tag của bài đang chọn</h3>
           <div className="labeling-tag-groups">
+            {selectedArticleId == null && (
+              <p className="labeling-tag-empty labeling-tag-empty--center">Chọn một bài để xem tag.</p>
+            )}
             {ENTITY_TYPES.map((type) => {
               const color = ENTITY_COLORS[type];
               const items = groupedTags[type] || [];
@@ -420,7 +477,7 @@ export default function LabelingPage() {
                   {items.map((item, index) => (
                     <div key={`${type}-${index}`} className="labeling-tag-item">
                       <span className="labeling-tag-item-text">{item.text}</span>
-                      <span className="labeling-tag-item-meta">{item.articleTitle} ({item.start}-{item.end})</span>
+                      <span className="labeling-tag-item-meta">({item.start}-{item.end})</span>
                     </div>
                   ))}
                 </div>

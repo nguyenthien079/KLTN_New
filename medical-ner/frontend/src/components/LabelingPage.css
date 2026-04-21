@@ -70,6 +70,7 @@
 }
 
 .labeling-table-wrap {
+  position: relative;
   height: 100%;
   overflow: auto;
 }
@@ -92,11 +93,87 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.labeling-status-header-cell {
+  position: relative;
+}
+
+.labeling-status-filter {
+  position: relative;
+}
+
+.labeling-status-filter-btn {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.labeling-status-filter-value {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.labeling-status-filter-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  z-index: 30;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.labeling-status-filter-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.82rem;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.labeling-status-filter-item:hover {
+  background: #f8fafc;
+}
+
+.labeling-status-filter-item--active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
 .labeling-table td {
   padding: 11px 16px;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text);
   vertical-align: middle;
+}
+
+.labeling-table tbody tr {
+  cursor: pointer;
 }
 
 .labeling-checkbox-cell {
@@ -106,9 +183,35 @@
 
 .labeling-row--selected {
   background: #f8fafc;
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
 .labeling-table tr:last-child td { border-bottom: none; }
+
+.labeling-empty-filter-row {
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.labeling-table--empty tbody {
+  display: none;
+}
+
+.labeling-empty-filter-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 49px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  background: linear-gradient(to bottom, rgba(248, 250, 252, 0.45), rgba(248, 250, 252, 0.75));
+}
 
 .labeling-title-cell {
   max-width: none;
@@ -244,8 +347,6 @@
 }
 
 .labeling-article-text {
-  max-height: 230px;
-  overflow: auto;
   padding: 10px 12px;
 }
 
@@ -310,6 +411,11 @@
   margin: 0;
   font-size: 0.82rem;
   color: var(--color-text-muted);
+}
+
+.labeling-tag-empty--center {
+  padding: 18px 6px;
+  text-align: center;
 }
 
 .labeling-tag-item {
