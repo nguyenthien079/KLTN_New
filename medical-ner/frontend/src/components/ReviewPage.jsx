@@ -74,6 +74,7 @@ export default function ReviewPage({ readOnly = false }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [selectedLabelers, setSelectedLabelers] = useState([]);
 
   const load = async () => {
     setLoading(true);
@@ -112,8 +113,15 @@ export default function ReviewPage({ readOnly = false }) {
   if (loading) return <div className="review-loading">Đang tải...</div>;
   if (error) return <div className="review-error">{error}</div>;
 
-  const pending = items.filter((x) => x.status === 'pending_review');
-  const done = items.filter((x) => x.status !== 'pending_review');
+  // Get unique labelers
+  const allLabelers = [...new Set(items.map((x) => x.labeler_id).filter(Boolean))].sort();
+
+  // Filter items based on selected labelers
+  const filteredItems =
+    selectedLabelers.length === 0 ? items : items.filter((x) => selectedLabelers.includes(x.labeler_id));
+
+  const pending = filteredItems.filter((x) => x.status === 'pending_review');
+  const done = filteredItems.filter((x) => x.status !== 'pending_review');
 
   return (
     <div className="review-page">
@@ -123,14 +131,40 @@ export default function ReviewPage({ readOnly = false }) {
         {readOnly && <span className="review-count-done">Chế độ chỉ xem</span>}
         <button className="review-refresh-btn" onClick={load}>Làm mới</button>
       </div>
+
+      {/* Labeler filter */}
+      {allLabelers.length > 0 && (
+        <div className="review-filter">
+          <label className="review-filter-label">Lọc theo chuyên gia:</label>
+          <div className="review-filter-items">
+            {allLabelers.map((labeler) => (
+              <label key={labeler} className="review-filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedLabelers.includes(labeler)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedLabelers((prev) => [...prev, labeler]);
+                    } else {
+                      setSelectedLabelers((prev) => prev.filter((id) => id !== labeler));
+                    }
+                  }}
+                />
+                <span>{labeler}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       {actionError && <p className="review-error">{actionError}</p>}
 
-      {items.length === 0 && (
+      {filteredItems.length === 0 && (
         <div className="review-empty">Chưa có dữ liệu gán nhãn nào.</div>
       )}
 
       <div className="review-list">
-        {items.map((item) => (
+        {filteredItems.map((item) => (
           <div key={item.id} className={`review-item review-item--${item.status}`}>
             <div className="review-item-header">
               <span className={`review-badge review-badge--${item.status}`}>

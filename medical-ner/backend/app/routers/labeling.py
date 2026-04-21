@@ -57,6 +57,13 @@ class AssignRequest(BaseModel):
     blind_mode: bool = False
 
 
+class BulkAssignRequest(BaseModel):
+    article_ids: list[int]
+    labeler_ids: list[str]
+    blind_mode: bool = False
+    initial_annotations: dict[str, list[AnnotationIn]] = {}
+
+
 class BlindModeRequest(BaseModel):
     blind_mode: bool
 
@@ -105,6 +112,13 @@ class ReviewQueueItem(BaseModel):
     labeler_id: str
 
 
+class NotificationItem(BaseModel):
+    article_id: int
+    article_title: Optional[str]
+    created_at: Optional[str]
+    message: str
+
+
 # ── Endpoints ─────────────────────────────────────────────
 
 @router.get("/articles", response_model=list[ArticleListItem])
@@ -113,10 +127,39 @@ async def list_articles(
     user: User = Depends(get_current_user),
 ):
     """List all articles available for labeling with status per current user."""
-    articles_result = await db.execute(
-        select(Article).order_by(Article.id).limit(200)
-    )
-    articles = articles_result.scalars().all()
+    # Experts only see files explicitly assigned by admin.
+    if user.role == "chuyen_gia":
+        assigned_result = await db.execute(
+            select(LabelAssignment.article_id)
+            .where(LabelAssignment.labeler_id == user.id)
+            .where(
+                LabelAssignment.assigned_by.in_(
+                    select(User.id).where(User.role == "admin")
+                )
+            )
+        )
+        assigned_ids = {row[0] for row in assigned_result}
+        if not assigned_ids:
+            return []
+
+        articles_result = await db.execute(
+            select(Article)
+            .where(Article.id.in_(assigned_ids))
+            .order_by(Article.id)
+            .limit(200)
+        )
+        articles = articles_result.scalars().all()
+    else:
+        articles_result = await db.execute(
+            select(Article).order_by(Article.id).limit(200)
+        )
+        articles = articles_result.scalars().all()
+
+        assigned_result = await db.execute(
+            select(LabelAssignment.article_id)
+            .where(LabelAssignment.labeler_id == user.id)
+        )
+        assigned_ids = {row[0] for row in assigned_result}
 
     # submission counts per article
     counts_result = await db.execute(
@@ -131,13 +174,6 @@ async def list_articles(
         .where(LabelSubmission.labeler_id == user.id)
     )
     my_subs = {row[0]: row[1] for row in my_subs_result}
-
-    # assignments for current user
-    assigned_result = await db.execute(
-        select(LabelAssignment.article_id)
-        .where(LabelAssignment.labeler_id == user.id)
-    )
-    assigned_ids = {row[0] for row in assigned_result}
 
     return [
         ArticleListItem(
@@ -298,7 +334,10 @@ async def assign_article(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Admin or expert assigns an article to a labeler."""
+    """Admin assigns one or more articles to experts."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền bàn giao")
+
     existing = await db.execute(
         select(LabelAssignment)
         .where(LabelAssignment.article_id == request.article_id)
@@ -322,6 +361,150 @@ async def assign_article(
     db.add(assignment)
     await db.commit()
     return {"status": "assigned"}
+
+
+@router.post("/assign/bulk")
+async def assign_articles_bulk(
+    request: BulkAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Admin assigns multiple articles to multiple experts in one request."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền bàn giao")
+
+    article_ids = sorted({aid for aid in request.article_ids if aid is not None})
+    labeler_ids = sorted({lid for lid in request.labeler_ids if lid})
+
+    if not article_ids:
+        raise HTTPException(status_code=400, detail="Danh sách file/text rỗng")
+    if not labeler_ids:
+        raise HTTPException(status_code=400, detail="Danh sách chuyên gia rỗng")
+
+    # Validate articles exist
+    articles_result = await db.execute(select(Article.id).where(Article.id.in_(article_ids)))
+    existing_article_ids = {row[0] for row in articles_result}
+    missing_article_ids = [aid for aid in article_ids if aid not in existing_article_ids]
+    if missing_article_ids:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy article_id: {missing_article_ids}")
+
+    # Validate experts
+    users_result = await db.execute(
+        select(User.id).where(User.id.in_(labeler_ids)).where(User.role == "chuyen_gia")
+    )
+    expert_ids = {row[0] for row in users_result}
+    missing_experts = [uid for uid in labeler_ids if uid not in expert_ids]
+    if missing_experts:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy chuyên gia hợp lệ: {missing_experts}")
+
+    existing_pairs_result = await db.execute(
+        select(LabelAssignment.article_id, LabelAssignment.labeler_id)
+        .where(LabelAssignment.article_id.in_(article_ids))
+        .where(LabelAssignment.labeler_id.in_(labeler_ids))
+    )
+    existing_pairs = {(row[0], row[1]) for row in existing_pairs_result}
+
+    # Normalize imported annotations by article_id for later draft seeding.
+    initial_annotations_by_article: dict[int, list[AnnotationIn]] = {}
+    for article_id_key, annotations in (request.initial_annotations or {}).items():
+        try:
+            normalized_article_id = int(article_id_key)
+        except (TypeError, ValueError):
+            continue
+        if normalized_article_id in article_ids:
+            initial_annotations_by_article[normalized_article_id] = annotations or []
+
+    created = 0
+    skipped = 0
+    for article_id in article_ids:
+        for labeler_id in labeler_ids:
+            if (article_id, labeler_id) in existing_pairs:
+                skipped += 1
+                continue
+            db.add(
+                LabelAssignment(
+                    article_id=article_id,
+                    labeler_id=labeler_id,
+                    assigned_by=user.id,
+                    blind_mode=request.blind_mode,
+                )
+            )
+            created += 1
+
+            if initial_annotations_by_article.get(article_id):
+                sub_result = await db.execute(
+                    select(LabelSubmission)
+                    .where(LabelSubmission.article_id == article_id)
+                    .where(LabelSubmission.labeler_id == labeler_id)
+                )
+                submission = sub_result.scalar_one_or_none()
+                if submission is None:
+                    submission = LabelSubmission(
+                        article_id=article_id,
+                        labeler_id=labeler_id,
+                        status="draft",
+                    )
+                    db.add(submission)
+                    await db.flush()
+
+                    for ann_in in initial_annotations_by_article[article_id]:
+                        db.add(
+                            LabelAnnotation(
+                                submission_id=submission.id,
+                                entity_type=ann_in.entity_type,
+                                start_offset=ann_in.start_offset,
+                                end_offset=ann_in.end_offset,
+                                surface_text=ann_in.surface_text,
+                                comment=ann_in.comment,
+                            )
+                        )
+
+    await db.commit()
+    return {
+        "status": "assigned",
+        "created": created,
+        "skipped": skipped,
+        "article_count": len(article_ids),
+        "expert_count": len(labeler_ids),
+    }
+
+
+@router.get("/notifications", response_model=list[NotificationItem])
+async def get_notifications(
+    limit: int = Query(20, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Recent assignment notifications for experts."""
+    if user.role != "chuyen_gia":
+        return []
+
+    result = await db.execute(
+        select(LabelAssignment, Article.title)
+        .join(Article, Article.id == LabelAssignment.article_id)
+        .where(LabelAssignment.labeler_id == user.id)
+        .where(
+            LabelAssignment.assigned_by.in_(
+                select(User.id).where(User.role == "admin")
+            )
+        )
+        .order_by(LabelAssignment.created_at.desc())
+        .limit(limit)
+    )
+
+    notifications = []
+    for assignment, article_title in result.all():
+        title = article_title or f"Bài {assignment.article_id}"
+        created_at = assignment.created_at.isoformat() if assignment.created_at else None
+        notifications.append(
+            NotificationItem(
+                article_id=assignment.article_id,
+                article_title=article_title,
+                created_at=created_at,
+                message=f"Admin đã bàn giao: {title}",
+            )
+        )
+    return notifications
 
 
 @router.get("/articles/{article_id}/suggest")

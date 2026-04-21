@@ -24,20 +24,19 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
-  const [tab, setTab] = useState('ner');
+  const [tab, setTab] = useState('labeling');
   const role = user?.role;
 
   const roleTabConfig = useMemo(() => {
     if (role === 'chuyen_gia') {
       return [
-        { id: 'ner', label: 'Phân tích NER' },
         { id: 'labeling', label: 'Labeling' },
       ];
     }
     if (role === 'admin') {
       return [
         { id: 'dashboard', label: 'Dashboard' },
-        { id: 'data', label: 'Danh sách file/text' },
+        { id: 'data', label: 'Bàn giao' },
         { id: 'review', label: 'Duyệt gán nhãn' },
         { id: 'users', label: 'Quản lý user' },
       ];

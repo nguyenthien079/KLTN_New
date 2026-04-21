@@ -185,6 +185,21 @@ export const assignArticle = async (articleId, labelerId, blindMode = false) => 
   return response.data;
 };
 
+export const assignArticlesBulk = async (articleIds, labelerIds, blindMode = false, initialAnnotations = {}) => {
+  const response = await api.post('/api/labeling/assign/bulk', {
+    article_ids: articleIds,
+    labeler_ids: labelerIds,
+    blind_mode: blindMode,
+    initial_annotations: initialAnnotations,
+  });
+  return response.data;
+};
+
+export const getLabelingNotifications = async (limit = 20) => {
+  const response = await api.get('/api/labeling/notifications', { params: { limit } });
+  return response.data;
+};
+
 // Role requests
 export const requestRoleUpgrade = async () => {
   const response = await api.post('/api/role-requests/request');
