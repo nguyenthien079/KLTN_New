@@ -25,7 +25,7 @@ class PhoBERTExtractor(BaseExtractor):
                 model=model,
                 tokenizer=tokenizer,
                 aggregation_strategy="simple",
-                device=-1  # CPU; set to 0 for GPU
+                device=-1
             )
 
             self._is_available = True
@@ -41,27 +41,30 @@ class PhoBERTExtractor(BaseExtractor):
             results = self._pipeline(text)
             entities = []
             for result in results:
-                # Skip entities with missing position information
                 start = result.get('start')
                 end = result.get('end')
-                
-                if start is None or end is None:
-                    # Try to find the word in text as fallback
-                    word = result['word'].strip()
-                    try:
-                        start = text.lower().find(word.lower())
-                        if start != -1:
-                            end = start + len(word)
-                        else:
-                            print(f"[PhoBERT] Skipping entity '{word}' - position not found")
-                            continue
-                    except Exception:
-                        print(f"[PhoBERT] Skipping entity '{word}' - invalid position")
+
+                if start is not None and end is not None:
+                    word = text[start:end]
+                else:
+                    raw = result['word']
+                    has_bpe_cut = raw.endswith('@@')
+                    word = raw.replace('@@', '').strip()
+                    if not word:
                         continue
-                
+                    start = text.lower().find(word.lower())
+                    if start == -1:
+                        continue
+                    end = start + len(word)
+                    # BPE cut: extend end to next whitespace to recover missing chars
+                    if has_bpe_cut:
+                        while end < len(text) and text[end] not in (' ', '\n', '\t'):
+                            end += 1
+                    word = text[start:end]
+
                 entity = Entity(
-                    text=result['word'],
-                    normalized_text=self.normalize_text(result['word']),
+                    text=word,
+                    normalized_text=self.normalize_text(word),
                     entity_type=result['entity_group'],
                     start=start,
                     end=end,

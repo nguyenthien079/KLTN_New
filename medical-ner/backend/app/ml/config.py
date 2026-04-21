@@ -7,10 +7,12 @@ ENTITY_TYPES: Dict[str, str] = {
     'SYMPTOM': 'Triệu chứng',
     'TREATMENT': 'Phương pháp điều trị',
     'BODY_PART': 'Cơ quan cơ thể',
-    'TEST': 'Xét nghiệm'
+    'TEST': 'Xét nghiệm',
+    'VALUE': 'Chỉ số/giá trị',
+    'DATE': 'Thời gian',
 }
 
-# BIO labels (13 total)
+# BIO labels (17 total)
 BIO_LABELS: List[str] = [
     'O',
     'B-DISEASE', 'I-DISEASE',
@@ -18,7 +20,9 @@ BIO_LABELS: List[str] = [
     'B-SYMPTOM', 'I-SYMPTOM',
     'B-TREATMENT', 'I-TREATMENT',
     'B-BODY_PART', 'I-BODY_PART',
-    'B-TEST', 'I-TEST'
+    'B-TEST', 'I-TEST',
+    'B-VALUE', 'I-VALUE',
+    'B-DATE', 'I-DATE',
 ]
 
 # Ensemble extractor weights

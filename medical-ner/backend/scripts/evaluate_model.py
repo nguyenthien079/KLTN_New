@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import argparse
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -10,19 +11,12 @@ from seqeval.metrics import classification_report
 
 MAX_LENGTH = 256
 
-LABELS = [
-    'O',
-    'B-DISEASE', 'I-DISEASE',
-    'B-DRUG',    'I-DRUG',
-    'B-SYMPTOM', 'I-SYMPTOM',
-    'B-TREATMENT', 'I-TREATMENT',
-    'B-BODY_PART', 'I-BODY_PART',
-    'B-TEST',    'I-TEST',
-]
-id2label = {i: l for i, l in enumerate(LABELS)}
+
+def normalize_id2label(raw_id2label) -> dict:
+    return {int(key): value for key, value in raw_id2label.items()}
 
 
-def predict(model, tokenizer, tokens: list, device) -> list:
+def predict(model, tokenizer, tokens: list, device, id2label: dict) -> list:
     """Run NER on a token list, return BIO tag list of same length."""
     # Tokenize with word-level alignment
     encoding = tokenizer(
@@ -67,11 +61,10 @@ def predict(model, tokenizer, tokens: list, device) -> list:
     return pred_tags
 
 
-def evaluate():
-    with open("data/training/test.json", 'r', encoding='utf-8') as f:
+def evaluate(model_path: str, test_data_path: str):
+    with open(test_data_path, 'r', encoding='utf-8') as f:
         test_data = json.load(f)
 
-    model_path = "models/phobert-medical/final_model"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
     print(f"Test samples: {len(test_data)}\n")
@@ -79,13 +72,14 @@ def evaluate():
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     model = AutoModelForTokenClassification.from_pretrained(model_path).to(device)
     model.eval()
+    id2label = normalize_id2label(model.config.id2label)
 
     true_labels, pred_labels = [], []
     errors = 0
 
     for i, item in enumerate(test_data):
         try:
-            pred_tags = predict(model, tokenizer, item["tokens"], device)
+            pred_tags = predict(model, tokenizer, item["tokens"], device, id2label)
             true_tags = item["tags"]
 
             # Truncate true tags to same length if needed
@@ -107,5 +101,23 @@ def evaluate():
     print(classification_report(true_labels, pred_labels))
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Evaluate token-classification model on test split")
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        default="models/phobert-medical/final_model",
+        help="Path to trained model directory",
+    )
+    parser.add_argument(
+        "--test-data",
+        type=str,
+        default="data/training/test.json",
+        help="Path to test split json",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    evaluate()
+    args = parse_args()
+    evaluate(model_path=args.model_path, test_data_path=args.test_data)
