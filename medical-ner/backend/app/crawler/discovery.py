@@ -75,28 +75,19 @@ class SiteDiscovery:
                 if link not in found:
                     log(link)
                     depth2_urls.add(link)
-                if len(found) >= 1000:
-                    break
-            if len(found) >= 1000:
-                break
 
         # Depth 2: crawl URLs discovered during depth 1
-        if len(found) < 1000:
-            for url in sorted(depth2_urls - visited)[:200]:
-                if url in visited:
-                    continue
-                visited.add(url)
-                await asyncio.sleep(config.request_delay)
-                html = await self.extractor.fetch_html(url)
-                if not html:
-                    continue
-                for link in self._extract_links(html, url, domain):
-                    if link not in found:
-                        log(link)
-                    if len(found) >= 1000:
-                        break
-                if len(found) >= 1000:
-                    break
+        for url in sorted(depth2_urls - visited)[:200]:
+            if url in visited:
+                continue
+            visited.add(url)
+            await asyncio.sleep(config.request_delay)
+            html = await self.extractor.fetch_html(url)
+            if not html:
+                continue
+            for link in self._extract_links(html, url, domain):
+                if link not in found:
+                    log(link)
 
         return sorted(found)
 
