@@ -365,6 +365,12 @@
   color: var(--color-text-muted);
 }
 
+.labeling-batch-reject-reason {
+  color: #b91c1c;
+  font-weight: 500;
+  min-height: 1.2em;
+}
+
 .labeling-articles-scroll {
   flex: 1;
   min-height: 0;

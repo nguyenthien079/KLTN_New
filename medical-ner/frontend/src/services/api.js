@@ -119,8 +119,8 @@ export const confirmCorrection = async (id) => {
   return response.data;
 };
 
-export const rejectCorrection = async (id) => {
-  const response = await api.patch(`/api/labeling/review/${id}/reject`);
+export const rejectCorrection = async (id, reason = '') => {
+  const response = await api.patch(`/api/labeling/review/${id}/reject`, { reason });
   return response.data;
 };
 

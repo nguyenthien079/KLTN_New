@@ -106,6 +106,7 @@ class SubmissionOut(BaseModel):
     labeler_id: str
     labeler_name: Optional[str]
     status: str
+    reject_reason: Optional[str] = None
     annotations: list[AnnotationOut]
 
 
@@ -118,6 +119,11 @@ class ReviewQueueItem(BaseModel):
     corrected_entities: list
     status: str
     labeler_id: str
+    reject_reason: Optional[str] = None
+
+
+class ReviewRejectRequest(BaseModel):
+    reason: Optional[str] = None
 
 
 class NotificationItem(BaseModel):
@@ -257,6 +263,7 @@ async def get_article_submissions(
             labeler_id=sub.labeler_id,
             labeler_name=(labeler.display_name or labeler.username) if labeler else sub.labeler_id[:8],
             status=sub.status,
+            reject_reason=sub.reject_reason,
             annotations=[
                 AnnotationOut(
                     id=ann.id,
@@ -481,37 +488,65 @@ async def get_notifications(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Recent assignment notifications for experts."""
+    """Recent assignment and rejection notifications for experts."""
     if not has_role(user, "chuyen_gia"):
         return []
 
     admin_users = await _get_users_with_role(db, "admin")
     admin_ids = [u.id for u in admin_users]
-    if not admin_ids:
-        return []
+    notifications_with_time: list[tuple[Optional[object], NotificationItem]] = []
 
-    result = await db.execute(
-        select(LabelAssignment, Article.title)
-        .join(Article, Article.id == LabelAssignment.article_id)
-        .where(LabelAssignment.labeler_id == user.id)
-        .where(LabelAssignment.assigned_by.in_(admin_ids))
-        .order_by(LabelAssignment.created_at.desc())
+    if admin_ids:
+        assignment_result = await db.execute(
+            select(LabelAssignment, Article.title)
+            .join(Article, Article.id == LabelAssignment.article_id)
+            .where(LabelAssignment.labeler_id == user.id)
+            .where(LabelAssignment.assigned_by.in_(admin_ids))
+            .order_by(LabelAssignment.created_at.desc())
+            .limit(limit)
+        )
+
+        for assignment, article_title in assignment_result.all():
+            title = article_title or f"Bài {assignment.article_id}"
+            created_at = assignment.created_at.isoformat() if assignment.created_at else None
+            notifications_with_time.append((
+                assignment.created_at,
+                NotificationItem(
+                    article_id=assignment.article_id,
+                    article_title=article_title,
+                    created_at=created_at,
+                    message=f"Admin đã bàn giao: {title}",
+                ),
+            ))
+
+    rejected_result = await db.execute(
+        select(LabelSubmission, Article.title)
+        .join(Article, Article.id == LabelSubmission.article_id)
+        .where(LabelSubmission.labeler_id == user.id)
+        .where(LabelSubmission.status == "rejected")
+        .order_by(LabelSubmission.updated_at.desc())
         .limit(limit)
     )
-
-    notifications = []
-    for assignment, article_title in result.all():
-        title = article_title or f"Bài {assignment.article_id}"
-        created_at = assignment.created_at.isoformat() if assignment.created_at else None
-        notifications.append(
+    for sub, article_title in rejected_result.all():
+        title = article_title or f"Bài {sub.article_id}"
+        reason = (sub.reject_reason or "").strip()
+        reason_text = f" Ly do: {reason}" if reason else ""
+        created_at = sub.updated_at.isoformat() if sub.updated_at else None
+        notifications_with_time.append((
+            sub.updated_at,
             NotificationItem(
-                article_id=assignment.article_id,
+                article_id=sub.article_id,
                 article_title=article_title,
                 created_at=created_at,
-                message=f"Admin đã bàn giao: {title}",
-            )
-        )
-    return notifications
+                message=f"Bài của bạn bị từ chối: {title}.{reason_text}",
+            ),
+        ))
+
+    notifications_with_time.sort(
+        key=lambda x: x[0].timestamp() if x[0] is not None else 0.0,
+        reverse=True,
+    )
+    return [item for _, item in notifications_with_time[:limit]]
 
 
 @router.get("/articles/{article_id}/suggest")
@@ -704,6 +739,7 @@ async def get_label_review_queue(
             ],
             status="pending_review" if sub.status == "submitted" else sub.status,
             labeler_id=(labeler.display_name or labeler.username) if labeler else sub.labeler_id,
+            reject_reason=sub.reject_reason,
         ))
 
     return items
@@ -726,6 +762,7 @@ async def confirm_label_submission(
     if not sub:
         raise HTTPException(status_code=404, detail="Không tìm thấy submission")
     sub.status = "confirmed"
+    sub.reject_reason = None
 
     annotations = sub.annotations or []
     if annotations:
@@ -807,6 +844,7 @@ async def _upsert_entities(db: AsyncSession, article_id: int, annotations: list[
 @router.patch("/review/{submission_id}/reject")
 async def reject_label_submission(
     submission_id: str,
+    request: ReviewRejectRequest,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -817,5 +855,6 @@ async def reject_label_submission(
     if not sub:
         raise HTTPException(status_code=404, detail="Không tìm thấy submission")
     sub.status = "rejected"
+    sub.reject_reason = (request.reason or "").strip() or None
     await db.commit()
-    return {"id": submission_id, "status": "rejected"}
+    return {"id": submission_id, "status": "rejected", "reject_reason": sub.reject_reason}

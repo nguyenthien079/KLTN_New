@@ -223,6 +223,20 @@
   letter-spacing: 0.01em;
 }
 
+.tab-nav-bell-mark-all {
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tab-nav-bell-mark-all:hover {
+  text-decoration: underline;
+}
+
 .tab-nav-bell-list {
   overflow: auto;
   padding: 8px;
@@ -252,6 +266,24 @@
 .tab-nav-bell-item:hover {
   border-color: var(--color-primary);
   background: #f0fafd;
+}
+
+.tab-nav-bell-item--reject {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tab-nav-bell-item--reject:hover {
+  border-color: #fca5a5;
+  background: #ffe4e6;
+}
+
+.tab-nav-bell-item--reject span {
+  color: #b91c1c;
+}
+
+.tab-nav-bell-item--read {
+  opacity: 0.52;
 }
 
 .tab-nav-bell-item em {

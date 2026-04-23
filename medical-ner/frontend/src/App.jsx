@@ -26,6 +26,7 @@ function App() {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('labeling');
   const [notifications, setNotifications] = useState([]);
+  const [readNotificationKeys, setReadNotificationKeys] = useState([]);
   const [isBellOpen, setIsBellOpen] = useState(false);
   const [labelingFocusRequest, setLabelingFocusRequest] = useState(null);
   const bellRef = useRef(null);
@@ -39,6 +40,10 @@ function App() {
     [user?.roles, user?.role]
   );
   const hasRole = (roleName) => roles.includes(roleName);
+  const notificationReadStorageKey = useMemo(
+    () => `labeling_read_notifications_${user?.user_id || 'anonymous'}`,
+    [user?.user_id]
+  );
 
   const roleTabConfig = useMemo(() => {
     const tabs = [];
@@ -72,6 +77,7 @@ function App() {
   useEffect(() => {
     if (!hasRole('chuyen_gia')) {
       setNotifications([]);
+      setReadNotificationKeys([]);
       setIsBellOpen(false);
       return;
     }
@@ -80,6 +86,47 @@ function App() {
       .then((data) => setNotifications(data || []))
       .catch(() => setNotifications([]));
   }, [roles, user?.user_id]);
+
+  useEffect(() => {
+    if (!hasRole('chuyen_gia')) return;
+    try {
+      const raw = localStorage.getItem(notificationReadStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setReadNotificationKeys(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setReadNotificationKeys([]);
+    }
+  }, [notificationReadStorageKey, roles]);
+
+  useEffect(() => {
+    if (!hasRole('chuyen_gia')) return;
+    try {
+      localStorage.setItem(notificationReadStorageKey, JSON.stringify(readNotificationKeys));
+    } catch {
+      // Ignore localStorage write errors.
+    }
+  }, [readNotificationKeys, notificationReadStorageKey, roles]);
+
+  const notificationItems = useMemo(
+    () => notifications.map((item) => {
+      const message = String(item?.message || '');
+      const key = `${item?.article_id || ''}|${item?.created_at || ''}|${message}`;
+      const isRejected = message.toLowerCase().includes('từ chối') || message.toLowerCase().includes('tu choi');
+      const isRead = readNotificationKeys.includes(key);
+      return {
+        ...item,
+        key,
+        isRejected,
+        isRead,
+      };
+    }),
+    [notifications, readNotificationKeys]
+  );
+
+  const unreadNotificationCount = useMemo(
+    () => notificationItems.filter((item) => !item.isRead).length,
+    [notificationItems]
+  );
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -138,9 +185,22 @@ function App() {
     }
   };
 
-  const openNotificationArticle = (articleId) => {
+  const markNotificationAsRead = (key) => {
+    setReadNotificationKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setReadNotificationKeys((prev) => {
+      const merged = new Set(prev);
+      notificationItems.forEach((item) => merged.add(item.key));
+      return Array.from(merged);
+    });
+  };
+
+  const openNotificationArticle = (notificationItem) => {
+    markNotificationAsRead(notificationItem.key);
     setTab('labeling');
-    setLabelingFocusRequest({ articleId, nonce: Date.now() });
+    setLabelingFocusRequest({ articleId: notificationItem.article_id, nonce: Date.now() });
     setIsBellOpen(false);
   };
 
@@ -168,11 +228,11 @@ function App() {
                 <button
                   className={`tab-nav-bell-btn${isBellOpen ? ' tab-nav-bell-btn--active' : ''}`}
                   onClick={() => setIsBellOpen((prev) => !prev)}
-                  title="Thông báo bàn giao"
+                  title="Thông báo"
                 >
                   <span className="tab-nav-bell-icon" aria-hidden="true">🔔</span>
-                  {notifications.length > 0 && (
-                    <span className="tab-nav-bell-badge">{notifications.length}</span>
+                  {unreadNotificationCount > 0 && (
+                    <span className="tab-nav-bell-badge">{unreadNotificationCount}</span>
                   )}
                 </button>
 
@@ -180,16 +240,25 @@ function App() {
                   <div className="tab-nav-bell-panel">
                     <div className="tab-nav-bell-header">
                       <strong>Thông báo</strong>
+                      {notificationItems.length > 0 && unreadNotificationCount > 0 && (
+                        <button
+                          type="button"
+                          className="tab-nav-bell-mark-all"
+                          onClick={markAllNotificationsAsRead}
+                        >
+                          Đánh dấu tất cả đã đọc
+                        </button>
+                      )}
                     </div>
                     <div className="tab-nav-bell-list">
-                      {notifications.length === 0 && (
+                      {notificationItems.length === 0 && (
                         <p className="tab-nav-bell-empty">Hiện chưa có thông báo mới.</p>
                       )}
-                      {notifications.map((item, idx) => (
+                      {notificationItems.map((item) => (
                         <button
-                          key={`${item.article_id}-${idx}`}
-                          className="tab-nav-bell-item"
-                          onClick={() => openNotificationArticle(item.article_id)}
+                          key={item.key}
+                          className={`tab-nav-bell-item${item.isRejected ? ' tab-nav-bell-item--reject' : ''}${item.isRead ? ' tab-nav-bell-item--read' : ''}`}
+                          onClick={() => openNotificationArticle(item)}
                         >
                           <span>{item.message}</span>
                           <em>Mở file</em>

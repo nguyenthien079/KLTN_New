@@ -144,6 +144,7 @@ export default function LabelingPage({ focusRequest = null }) {
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [articleDetails, setArticleDetails] = useState({});
   const [annotationsByArticle, setAnnotationsByArticle] = useState({});
+  const [rejectReasonByArticle, setRejectReasonByArticle] = useState({});
   const [popup, setPopup] = useState(null); // {articleId, x, y, start, end, text}
   const [saveMsg, setSaveMsg] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -197,6 +198,10 @@ export default function LabelingPage({ focusRequest = null }) {
       setAnnotationsByArticle((prev) => ({
         ...prev,
         [articleId]: mine?.annotations || [],
+      }));
+      setRejectReasonByArticle((prev) => ({
+        ...prev,
+        [articleId]: mine?.reject_reason || null,
       }));
       loadedArticleIdsRef.current.add(articleId);
     } catch {
@@ -350,6 +355,7 @@ export default function LabelingPage({ focusRequest = null }) {
 
   const selectedArticle = selectedArticleId != null ? articleDetails[selectedArticleId] : null;
   const selectedAnnotations = selectedArticleId != null ? (annotationsByArticle[selectedArticleId] || []) : [];
+  const selectedRejectReason = selectedArticleId != null ? rejectReasonByArticle[selectedArticleId] : null;
 
   return (
     <div className="labeling-page">
@@ -455,7 +461,9 @@ export default function LabelingPage({ focusRequest = null }) {
 
         <div className="labeling-column labeling-column--middle">
           <div className="labeling-batch-toolbar">
-            <span>{selectedArticleId != null ? `Bài đang chọn: ${selectedArticle?.title || selectedArticle?.url || `#${selectedArticleId}`}` : 'Chọn một bài bên trái để bắt đầu'}</span>
+            <span className="labeling-batch-reject-reason">
+              {selectedRejectReason ? `Ly do reviewer tu choi: ${selectedRejectReason}` : ''}
+            </span>
             <div>
               <button className="labeling-btn labeling-btn--ghost" onClick={() => saveCurrent(false)} disabled={saving || selectedArticleId == null}>Lưu nháp</button>
               <button className="labeling-btn" onClick={() => saveCurrent(true)} disabled={saving || selectedArticleId == null}>Nộp bài</button>
