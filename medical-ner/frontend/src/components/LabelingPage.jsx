@@ -319,11 +319,24 @@ export default function LabelingPage() {
 
     if (selectedArticleId != null) {
       const article = articleDetails[selectedArticleId];
+      const articleText = article?.clean_text || '';
       const anns = annotationsByArticle[selectedArticleId] || [];
       anns.forEach((ann) => {
         if (!grouped[ann.entity_type]) grouped[ann.entity_type] = [];
+
+        let displayText = ann.surface_text || '';
+        if (
+          Number.isInteger(ann.start_offset)
+          && Number.isInteger(ann.end_offset)
+          && ann.start_offset >= 0
+          && ann.end_offset > ann.start_offset
+          && ann.end_offset <= articleText.length
+        ) {
+          displayText = articleText.slice(ann.start_offset, ann.end_offset);
+        }
+
         grouped[ann.entity_type].push({
-          text: ann.surface_text || '',
+          text: displayText,
           start: ann.start_offset,
           end: ann.end_offset,
         });
