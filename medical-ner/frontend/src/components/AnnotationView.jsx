@@ -107,7 +107,10 @@ function downloadBlob(blob, filename) {
 
 export default function AnnotationView({ articleId, onBack }) {
   const { user } = useAuth();
-  const canReview = user.role === 'chuyen_gia' || user.role === 'admin';
+  const roles = Array.isArray(user?.roles)
+    ? user.roles
+    : String(user?.role || '').split(',').map((r) => r.trim()).filter(Boolean);
+  const canReview = roles.includes('reviewer');
   const [article, setArticle] = useState(null);
   const [myAnnotations, setMyAnnotations] = useState([]);
   const [popup, setPopup] = useState(null); // {mode:'add'|'edit', x, y, start, end, text, currentType?, comment?, editIdx?}

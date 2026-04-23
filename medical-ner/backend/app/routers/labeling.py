@@ -18,7 +18,7 @@ from app.models.label_assignment import LabelAssignment
 from app.models.label_submission import LabelSubmission
 from app.models.label_annotation import LabelAnnotation
 from app.models.entity import Entity, EntityType
-from app.auth import get_current_user
+from app.auth import get_current_user, has_role
 
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _DICT_DIR = _DATA_DIR / "dicts"
@@ -34,6 +34,14 @@ _ENTITY_TYPE_TO_DICT: dict[str, str] = {
 }
 
 router = APIRouter()
+
+
+async def _get_users_with_role(db: AsyncSession, role: str, user_ids: list[str] | None = None) -> list[User]:
+    query = select(User)
+    if user_ids is not None:
+        query = query.where(User.id.in_(user_ids))
+    result = await db.execute(query)
+    return [u for u in result.scalars().all() if has_role(u, role)]
 
 
 # ── Schemas ──────────────────────────────────────────────
@@ -128,15 +136,15 @@ async def list_articles(
 ):
     """List all articles available for labeling with status per current user."""
     # Experts only see files explicitly assigned by admin.
-    if user.role == "chuyen_gia":
+    if has_role(user, "chuyen_gia"):
+        admin_users = await _get_users_with_role(db, "admin")
+        admin_ids = [u.id for u in admin_users]
+        if not admin_ids:
+            return []
         assigned_result = await db.execute(
             select(LabelAssignment.article_id)
             .where(LabelAssignment.labeler_id == user.id)
-            .where(
-                LabelAssignment.assigned_by.in_(
-                    select(User.id).where(User.role == "admin")
-                )
-            )
+            .where(LabelAssignment.assigned_by.in_(admin_ids))
         )
         assigned_ids = {row[0] for row in assigned_result}
         if not assigned_ids:
@@ -217,7 +225,7 @@ async def get_article_submissions(
     """
     # Check blind mode for this user on this article
     blind = False
-    if user.role == "chuyen_gia":
+    if has_role(user, "chuyen_gia"):
         assign = await db.execute(
             select(LabelAssignment)
             .where(LabelAssignment.article_id == article_id)
@@ -335,7 +343,7 @@ async def assign_article(
     user: User = Depends(get_current_user),
 ):
     """Admin assigns one or more articles to experts."""
-    if user.role != "admin":
+    if not has_role(user, "admin"):
         raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền bàn giao")
 
     existing = await db.execute(
@@ -370,7 +378,7 @@ async def assign_articles_bulk(
     user: User = Depends(get_current_user),
 ):
     """Admin assigns multiple articles to multiple experts in one request."""
-    if user.role != "admin":
+    if not has_role(user, "admin"):
         raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền bàn giao")
 
     article_ids = sorted({aid for aid in request.article_ids if aid is not None})
@@ -389,10 +397,8 @@ async def assign_articles_bulk(
         raise HTTPException(status_code=404, detail=f"Không tìm thấy article_id: {missing_article_ids}")
 
     # Validate experts
-    users_result = await db.execute(
-        select(User.id).where(User.id.in_(labeler_ids)).where(User.role == "chuyen_gia")
-    )
-    expert_ids = {row[0] for row in users_result}
+    experts = await _get_users_with_role(db, "chuyen_gia", labeler_ids)
+    expert_ids = {u.id for u in experts}
     missing_experts = [uid for uid in labeler_ids if uid not in expert_ids]
     if missing_experts:
         raise HTTPException(status_code=404, detail=f"Không tìm thấy chuyên gia hợp lệ: {missing_experts}")
@@ -476,18 +482,19 @@ async def get_notifications(
     user: User = Depends(get_current_user),
 ):
     """Recent assignment notifications for experts."""
-    if user.role != "chuyen_gia":
+    if not has_role(user, "chuyen_gia"):
+        return []
+
+    admin_users = await _get_users_with_role(db, "admin")
+    admin_ids = [u.id for u in admin_users]
+    if not admin_ids:
         return []
 
     result = await db.execute(
         select(LabelAssignment, Article.title)
         .join(Article, Article.id == LabelAssignment.article_id)
         .where(LabelAssignment.labeler_id == user.id)
-        .where(
-            LabelAssignment.assigned_by.in_(
-                select(User.id).where(User.role == "admin")
-            )
-        )
+        .where(LabelAssignment.assigned_by.in_(admin_ids))
         .order_by(LabelAssignment.created_at.desc())
         .limit(limit)
     )
@@ -649,9 +656,11 @@ async def toggle_blind_mode(
 @router.get("/review/queue", response_model=list[ReviewQueueItem])
 async def get_label_review_queue(
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    """Expert/Admin: list submitted and reviewed label submissions."""
+    """Reviewer: list submitted and reviewed label submissions."""
+    if not has_role(user, "reviewer"):
+        raise HTTPException(status_code=403, detail="Chỉ reviewer mới có quyền duyệt")
     result = await db.execute(
         select(LabelSubmission)
         .where(LabelSubmission.status.in_(["submitted", "confirmed", "rejected"]))
@@ -704,8 +713,10 @@ async def get_label_review_queue(
 async def confirm_label_submission(
     submission_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
+    if not has_role(user, "reviewer"):
+        raise HTTPException(status_code=403, detail="Chỉ reviewer mới có quyền duyệt")
     result = await db.execute(
         select(LabelSubmission)
         .where(LabelSubmission.id == submission_id)
@@ -797,8 +808,10 @@ async def _upsert_entities(db: AsyncSession, article_id: int, annotations: list[
 async def reject_label_submission(
     submission_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
+    if not has_role(user, "reviewer"):
+        raise HTTPException(status_code=403, detail="Chỉ reviewer mới có quyền duyệt")
     result = await db.execute(select(LabelSubmission).where(LabelSubmission.id == submission_id))
     sub = result.scalar_one_or_none()
     if not sub:

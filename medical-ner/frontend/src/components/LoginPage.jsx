@@ -30,37 +30,78 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
+      <div className="login-bg-pattern" aria-hidden="true" />
+
       <div className="login-card">
-        <h1 className="login-title">Medical NER</h1>
-        <p className="login-subtitle">Hệ thống nhận diện thực thể y tế</p>
-        <form className="login-form" onSubmit={handleSubmit}>
+        <div className="login-brand">
+          <div className="login-brand-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <rect width="28" height="28" rx="8" fill="var(--color-primary)" />
+              <path d="M14 6v16M6 14h16" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="login-title">Medical NER</h1>
+            <p className="login-subtitle">Hệ thống nhận diện thực thể y tế</p>
+          </div>
+        </div>
+
+        <div className="login-divider" />
+
+        <form className="login-form" onSubmit={handleSubmit} noValidate>
           <div className="login-field">
-            <label className="login-label">Tên đăng nhập</label>
+            <label className="login-label" htmlFor="lp-username">Tên đăng nhập</label>
             <input
+              id="lp-username"
               className="login-input"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               autoFocus
+              placeholder="Nhập tên đăng nhập"
             />
           </div>
+
           <div className="login-field">
-            <label className="login-label">Mật khẩu</label>
+            <label className="login-label" htmlFor="lp-password">Mật khẩu</label>
             <input
+              id="lp-password"
               className="login-input"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
+              placeholder="••••••••"
             />
           </div>
-          {error && <p className="login-error">{error}</p>}
+
+          {error && (
+            <div className="login-error" role="alert">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="6.5" stroke="currentColor" />
+                <path d="M7 4v3.5M7 9.5v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              {error}
+            </div>
+          )}
+
           <button className="login-btn" type="submit" disabled={loading}>
-            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+            {loading ? (
+              <>
+                <span className="login-spinner" aria-hidden="true" />
+                Đang đăng nhập…
+              </>
+            ) : (
+              'Đăng nhập'
+            )}
           </button>
         </form>
       </div>
+
+      <p className="login-footer">
+        Hệ thống NER · PhoBERT + Ensemble Model
+      </p>
     </div>
   );
 }

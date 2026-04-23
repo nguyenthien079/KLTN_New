@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from app.database import get_db
 from app.models.user import User
 from app.models.role_request import RoleRequest
-from app.auth import get_current_user, require_admin
+from app.auth import get_current_user, require_admin, parse_roles, roles_to_csv, has_role
 
 router = APIRouter()
 
@@ -27,8 +27,8 @@ async def request_role_upgrade(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """chuyen_gia requests upgrade to admin."""
-    if user.role != "chuyen_gia":
+    """Non-admin users can request upgrade to admin."""
+    if has_role(user, "admin"):
         raise HTTPException(status_code=400, detail="Chỉ chuyên gia mới có thể xin nâng quyền lên admin")
 
     # Check existing pending request
@@ -90,7 +90,9 @@ async def approve_request(
 
     user = await db.get(User, req.user_id)
     if user:
-        user.role = req.requested_role
+        current_roles = parse_roles(user.role)
+        if req.requested_role not in current_roles:
+            user.role = roles_to_csv([*current_roles, req.requested_role])
 
     await db.commit()
     return {"status": "approved"}

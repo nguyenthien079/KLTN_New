@@ -1,6 +1,6 @@
 // frontend/src/components/LabelingPage.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getArticleSubmissions, getLabelingArticle, getLabelingArticles, getLabelingNotifications, saveSubmission } from '../services/api';
+import { getArticleSubmissions, getLabelingArticle, getLabelingArticles, saveSubmission } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { ENTITY_COLORS } from '../config/entityColors';
 import './LabelingPage.css';
@@ -135,11 +135,10 @@ function ArticleAnnotatorCard({ article, annotations, onSelectText, onRemoveAnno
   );
 }
 
-export default function LabelingPage() {
+export default function LabelingPage({ focusRequest = null }) {
   const { user } = useAuth();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState([]);
   const [selectedArticleId, setSelectedArticleId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
@@ -163,17 +162,15 @@ export default function LabelingPage() {
   }, []);
 
   useEffect(() => {
-    Promise.all([getLabelingArticles(), getLabelingNotifications(8)])
-      .then(([data, notifData]) => {
+    getLabelingArticles()
+      .then((data) => {
         setArticles(data || []);
-        setNotifications(notifData || []);
         if (data?.length) {
           setSelectedArticleId((current) => current ?? data[0].article_id);
         }
       })
       .catch(() => {
         setArticles([]);
-        setNotifications([]);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -209,6 +206,12 @@ export default function LabelingPage() {
       setLoadingArticleId(null);
     }
   }, [user.user_id]);
+
+  useEffect(() => {
+    const focusArticleId = focusRequest?.articleId;
+    if (focusArticleId == null) return;
+    loadArticle(focusArticleId);
+  }, [focusRequest, loadArticle]);
 
   useEffect(() => {
     if (selectedArticleId != null) {
@@ -358,28 +361,6 @@ export default function LabelingPage() {
 
       {loading && <p className="labeling-loading">Đang tải...</p>}
       {saveMsg && <p className="labeling-toast">{saveMsg}</p>}
-      {!loading && notifications.length > 0 && (
-        <section className="labeling-notification-panel">
-          <div className="labeling-notification-header">
-            <h3>Notification</h3>
-            <span>{notifications.length} thông báo mới</span>
-          </div>
-          <div className="labeling-notification-list">
-            {notifications.map((item, idx) => (
-              <div key={`${item.article_id}-${idx}`} className="labeling-notification-item">
-                <div className="labeling-notification-message">{item.message}</div>
-                <button
-                  type="button"
-                  className="labeling-notification-link"
-                  onClick={() => loadArticle(item.article_id)}
-                >
-                  Mở file
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       <div className="labeling-workspace">
         <div className="labeling-column labeling-column--left">

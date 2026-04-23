@@ -74,7 +74,14 @@ export default function DataListPage() {
         setServerItems(rows);
         setItems(rows);
         if (articleData?.length) setSelectedId(articleData[0].article_id);
-        setExperts((userData || []).filter((u) => u.role === 'chuyen_gia'));
+        setExperts(
+          (userData || []).filter((u) => {
+            const roles = Array.isArray(u.roles)
+              ? u.roles
+              : String(u.role || '').split(',').map((r) => r.trim()).filter(Boolean);
+            return roles.includes('chuyen_gia') && u.is_active !== false;
+          })
+        );
       })
       .finally(() => setLoading(false));
   }, []);

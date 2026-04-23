@@ -5,7 +5,15 @@ from sqlalchemy import select
 
 from app.database import get_db
 from app.models.user import User
-from app.auth import get_current_user, hash_password, require_admin
+from app.auth import (
+    get_current_user,
+    hash_password,
+    require_admin,
+    parse_roles,
+    normalize_roles,
+    roles_to_csv,
+    has_role,
+)
 
 router = APIRouter()
 
@@ -15,18 +23,22 @@ class UserResponse(BaseModel):
     username: str
     display_name: str | None
     role: str
+    roles: list[str]
+    is_active: bool
 
 
 class CreateUserRequest(BaseModel):
     username: str
     password: str
     display_name: str | None = None
-    role: str = "chuyen_gia"
+    role: str | None = None
+    roles: list[str] | None = None
 
 
 class UpdateUserRequest(BaseModel):
     display_name: str | None = None
     role: str | None = None
+    roles: list[str] | None = None
     password: str | None = None
 
 
@@ -35,14 +47,20 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    result = await db.execute(select(User).order_by(User.created_at))
+    result = await db.execute(
+        select(User)
+        .where(User.is_active.is_(True))
+        .order_by(User.created_at)
+    )
     users = result.scalars().all()
     return [
         UserResponse(
             user_id=u.id,
             username=u.username,
             display_name=u.display_name,
-            role=u.role,
+            role=parse_roles(u.role)[0],
+            roles=parse_roles(u.role),
+            is_active=u.is_active,
         )
         for u in users
     ]
@@ -58,14 +76,18 @@ async def create_user(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Tên đăng nhập đã tồn tại")
 
-    if request.role not in ("admin", "chuyen_gia"):
-        raise HTTPException(status_code=400, detail="Role phải là admin hoặc chuyen_gia")
+    if request.roles is not None:
+        roles = normalize_roles(request.roles)
+    elif request.role is not None:
+        roles = normalize_roles([request.role])
+    else:
+        roles = ["chuyen_gia"]
 
     user = User(
         username=request.username,
         hashed_password=hash_password(request.password),
         display_name=request.display_name,
-        role=request.role,
+        role=roles_to_csv(roles),
     )
     db.add(user)
     await db.commit()
@@ -74,7 +96,9 @@ async def create_user(
         user_id=user.id,
         username=user.username,
         display_name=user.display_name,
-        role=user.role,
+        role=parse_roles(user.role)[0],
+        roles=parse_roles(user.role),
+        is_active=user.is_active,
     )
 
 
@@ -90,14 +114,17 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
 
-    if request.role is not None and request.role not in ("admin", "chuyen_gia"):
-        raise HTTPException(status_code=400, detail="Role phải là admin hoặc chuyen_gia")
+    next_roles: list[str] | None = None
+    if request.roles is not None:
+        next_roles = normalize_roles(request.roles)
+    elif request.role is not None:
+        next_roles = normalize_roles([request.role])
 
-    if request.role is not None:
+    if next_roles is not None:
         # Prevent removing own admin role.
-        if user.id == current_user.id and request.role != "admin":
+        if user.id == current_user.id and "admin" not in next_roles:
             raise HTTPException(status_code=400, detail="Không thể tự hạ quyền admin của chính mình")
-        user.role = request.role
+        user.role = roles_to_csv(next_roles)
 
     if request.display_name is not None:
         user.display_name = request.display_name
@@ -111,7 +138,9 @@ async def update_user(
         user_id=user.id,
         username=user.username,
         display_name=user.display_name,
-        role=user.role,
+        role=parse_roles(user.role)[0],
+        roles=parse_roles(user.role),
+        is_active=user.is_active,
     )
 
 
@@ -121,7 +150,7 @@ async def delete_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if not has_role(current_user, "admin"):
         raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền này")
 
     if user_id == current_user.id:
@@ -132,6 +161,9 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
 
-    await db.delete(user)
+    if not user.is_active:
+        return {"status": "already_disabled", "user_id": user_id}
+
+    user.is_active = False
     await db.commit()
-    return {"status": "deleted", "user_id": user_id}
+    return {"status": "disabled", "user_id": user_id}

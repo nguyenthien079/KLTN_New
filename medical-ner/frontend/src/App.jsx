@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { analyzeText, analyzeUrl } from './services/api';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { analyzeText, analyzeUrl, getLabelingNotifications } from './services/api';
 import { useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import InputPanel from './components/InputPanel';
@@ -25,27 +25,41 @@ function App() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('labeling');
-  const role = user?.role;
+  const [notifications, setNotifications] = useState([]);
+  const [isBellOpen, setIsBellOpen] = useState(false);
+  const [labelingFocusRequest, setLabelingFocusRequest] = useState(null);
+  const bellRef = useRef(null);
+  const roles = useMemo(
+    () => (Array.isArray(user?.roles)
+      ? user.roles
+      : String(user?.role || '')
+          .split(',')
+          .map((r) => r.trim())
+          .filter(Boolean)),
+    [user?.roles, user?.role]
+  );
+  const hasRole = (roleName) => roles.includes(roleName);
 
   const roleTabConfig = useMemo(() => {
-    if (role === 'chuyen_gia') {
-      return [
-        { id: 'labeling', label: 'Labeling' },
-      ];
-    }
-    if (role === 'admin') {
-      return [
+    const tabs = [];
+    if (hasRole('admin')) {
+      tabs.push(
         { id: 'dashboard', label: 'Dashboard' },
         { id: 'data', label: 'Bàn giao' },
-        { id: 'review', label: 'Duyệt gán nhãn' },
-        { id: 'users', label: 'Quản lý user' },
-      ];
+        { id: 'users', label: 'Quản lý user' }
+      );
     }
-    return [
-      { id: 'ner', label: 'Phân tích NER' },
-      { id: 'labeling', label: 'Labeling' },
-    ];
-  }, [role]);
+    if (hasRole('reviewer')) {
+      tabs.push({ id: 'review', label: 'Duyệt gán nhãn' });
+    }
+    if (hasRole('chuyen_gia')) {
+      tabs.push({ id: 'labeling', label: 'Labeling' });
+    }
+    if (tabs.length === 0) {
+      tabs.push({ id: 'labeling', label: 'Labeling' });
+    }
+    return tabs;
+  }, [roles]);
 
   const allowedTabIds = useMemo(() => roleTabConfig.map((t) => t.id), [roleTabConfig]);
 
@@ -54,6 +68,28 @@ function App() {
       setTab(allowedTabIds[0] || 'labeling');
     }
   }, [allowedTabIds, tab]);
+
+  useEffect(() => {
+    if (!hasRole('chuyen_gia')) {
+      setNotifications([]);
+      setIsBellOpen(false);
+      return;
+    }
+
+    getLabelingNotifications(12)
+      .then((data) => setNotifications(data || []))
+      .catch(() => setNotifications([]));
+  }, [roles, user?.user_id]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (bellRef.current && !bellRef.current.contains(event.target)) {
+        setIsBellOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (!user) return <LoginPage />;
 
@@ -102,6 +138,12 @@ function App() {
     }
   };
 
+  const openNotificationArticle = (articleId) => {
+    setTab('labeling');
+    setLabelingFocusRequest({ articleId, nonce: Date.now() });
+    setIsBellOpen(false);
+  };
+
   return (
     <div className="page" onKeyDown={handleKeyDown}>
       <Header />
@@ -121,6 +163,43 @@ function App() {
             <span className="tab-nav-username">
               {user.display_name || user.username}
             </span>
+            {hasRole('chuyen_gia') && (
+              <div className="tab-nav-bell-wrap" ref={bellRef}>
+                <button
+                  className={`tab-nav-bell-btn${isBellOpen ? ' tab-nav-bell-btn--active' : ''}`}
+                  onClick={() => setIsBellOpen((prev) => !prev)}
+                  title="Thông báo bàn giao"
+                >
+                  <span className="tab-nav-bell-icon" aria-hidden="true">🔔</span>
+                  {notifications.length > 0 && (
+                    <span className="tab-nav-bell-badge">{notifications.length}</span>
+                  )}
+                </button>
+
+                {isBellOpen && (
+                  <div className="tab-nav-bell-panel">
+                    <div className="tab-nav-bell-header">
+                      <strong>Thông báo</strong>
+                    </div>
+                    <div className="tab-nav-bell-list">
+                      {notifications.length === 0 && (
+                        <p className="tab-nav-bell-empty">Hiện chưa có thông báo mới.</p>
+                      )}
+                      {notifications.map((item, idx) => (
+                        <button
+                          key={`${item.article_id}-${idx}`}
+                          className="tab-nav-bell-item"
+                          onClick={() => openNotificationArticle(item.article_id)}
+                        >
+                          <span>{item.message}</span>
+                          <em>Mở file</em>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <button className="tab-nav-logout" onClick={logout}>
               Đăng xuất
             </button>
@@ -152,7 +231,7 @@ function App() {
         )}
         {tab === 'crawl' && allowedTabIds.includes('crawl') && <CrawlPage />}
         {tab === 'pipeline' && allowedTabIds.includes('pipeline') && <PipelinePage />}
-        {tab === 'labeling' && allowedTabIds.includes('labeling') && <LabelingPage />}
+        {tab === 'labeling' && allowedTabIds.includes('labeling') && <LabelingPage focusRequest={labelingFocusRequest} />}
         {tab === 'review' && allowedTabIds.includes('review') && <ReviewPage />}
         {tab === 'users' && allowedTabIds.includes('users') && <UsersPage />}
       </div>
