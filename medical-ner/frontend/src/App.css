@@ -87,7 +87,7 @@
   background: transparent;
   font-size: 0.88rem;
   font-weight: 500;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   cursor: pointer;
   color: var(--color-text-muted);
   transition: color var(--transition), border-color var(--transition);
@@ -127,7 +127,7 @@
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   font-size: 0.81rem;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   cursor: pointer;
   color: var(--color-text-muted);
   transition: color var(--transition), border-color var(--transition), background var(--transition);
@@ -258,7 +258,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.83rem;
   transition: border-color var(--transition), background var(--transition);
 }
@@ -339,7 +339,7 @@
   color: var(--color-text-muted);
   font-size: 0.86rem;
   font-weight: 500;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   cursor: pointer;
   transition: background var(--transition), color var(--transition), box-shadow var(--transition);
   white-space: nowrap;
@@ -372,7 +372,7 @@
   border-radius: var(--radius-md);
   padding: 11px 14px;
   font-size: 0.93rem;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   color: var(--color-text);
   background: var(--color-bg);
   transition: border-color var(--transition), box-shadow var(--transition);
@@ -415,7 +415,7 @@
   border-radius: var(--radius-sm);
   font-size: 0.88rem;
   font-weight: 600;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   cursor: pointer;
   border: 1px solid transparent;
   transition: background var(--transition), box-shadow var(--transition), opacity var(--transition), transform 0.1s;
@@ -774,7 +774,7 @@
   border-radius: var(--radius-sm);
   font-size: 0.86rem;
   font-weight: 600;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   cursor: pointer;
   transition: background var(--transition), box-shadow var(--transition), transform 0.1s;
 }
@@ -798,7 +798,7 @@
   border-radius: var(--radius-sm);
   font-size: 0.86rem;
   font-weight: 600;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   cursor: pointer;
   transition: background var(--transition), box-shadow var(--transition), transform 0.1s;
 }
@@ -822,7 +822,7 @@
   border-radius: var(--radius-sm);
   font-size: 0.86rem;
   font-weight: 600;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   cursor: pointer;
   transition: background var(--transition), color var(--transition);
 }
