@@ -148,6 +148,8 @@ export default function LabelingPage({ focusRequest = null }) {
   const [popup, setPopup] = useState(null); // {articleId, x, y, start, end, text}
   const [saveMsg, setSaveMsg] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [loadingArticleId, setLoadingArticleId] = useState(null);
   const loadedArticleIdsRef = useRef(new Set());
   const statusFilterRef = useRef(null);
@@ -369,7 +371,15 @@ export default function LabelingPage({ focusRequest = null }) {
       {saveMsg && <p className="labeling-toast">{saveMsg}</p>}
 
       <div className="labeling-workspace">
-        <div className="labeling-column labeling-column--left">
+        <button
+          className="labeling-toggle-btn labeling-toggle-btn--left"
+          onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
+          title={isLeftPanelCollapsed ? 'Mở khung danh sách' : 'Ẩn khung danh sách'}
+        >
+          {isLeftPanelCollapsed ? '→' : '←'}
+        </button>
+
+        <div className={`labeling-column labeling-column--left ${isLeftPanelCollapsed ? 'labeling-column--collapsed' : ''}`}>
           <div className="labeling-table-wrap">
             <table className={`labeling-table${filteredSortedArticles.length === 0 ? ' labeling-table--empty' : ''}`}>
               <thead>
@@ -459,7 +469,7 @@ export default function LabelingPage({ focusRequest = null }) {
           </div>
         </div>
 
-        <div className="labeling-column labeling-column--middle">
+        <div className={`labeling-column labeling-column--middle ${isLeftPanelCollapsed ? 'left-collapsed' : ''} ${isRightPanelCollapsed ? 'right-collapsed' : ''}`}>
           <div className="labeling-batch-toolbar">
             <span className="labeling-batch-reject-reason">
               {selectedRejectReason ? `Ly do reviewer tu choi: ${selectedRejectReason}` : ''}
@@ -487,7 +497,7 @@ export default function LabelingPage({ focusRequest = null }) {
           </div>
         </div>
 
-        <div className="labeling-column labeling-column--right">
+        <div className={`labeling-column labeling-column--right ${isRightPanelCollapsed ? 'labeling-column--collapsed' : ''}`}>
           <h3 className="labeling-side-title">Tag của bài đang chọn</h3>
           <div className="labeling-tag-groups">
             {selectedArticleId == null && (
@@ -514,6 +524,14 @@ export default function LabelingPage({ focusRequest = null }) {
             })}
           </div>
         </div>
+
+        <button
+          className="labeling-toggle-btn labeling-toggle-btn--right"
+          onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+          title={isRightPanelCollapsed ? 'Mở khung tag' : 'Ẩn khung tag'}
+        >
+          {isRightPanelCollapsed ? '←' : '→'}
+        </button>
       </div>
 
       <EntityPopup
