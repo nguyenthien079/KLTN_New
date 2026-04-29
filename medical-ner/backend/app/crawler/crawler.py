@@ -178,6 +178,10 @@ class MedicalCrawler:
         saved_articles = []
 
         for data in articles_data:
+            for field in ("raw_html", "clean_text", "title"):
+                if isinstance(data.get(field), str):
+                    data[field] = data[field].replace("\x00", "")
+
             # Check duplicate by URL or content hash
             result = await self.db.execute(
                 select(Article).where(
