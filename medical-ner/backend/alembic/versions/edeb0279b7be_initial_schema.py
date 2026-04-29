@@ -23,7 +23,7 @@ def upgrade() -> None:
     # users (role VARCHAR(20) — expanded to 120 in later migration)
     op.create_table('users',
         sa.Column('id', sa.String(36), primary_key=True),
-        sa.Column('username', sa.String(100), nullable=False, unique=True, index=True),
+        sa.Column('username', sa.String(100), nullable=False),
         sa.Column('hashed_password', sa.String(200), nullable=False),
         sa.Column('role', sa.String(20), nullable=False),
         sa.Column('display_name', sa.String(100), nullable=True),
