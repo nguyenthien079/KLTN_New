@@ -92,6 +92,14 @@ class ArticleListItem(BaseModel):
     assigned_to_me: bool
 
 
+class ArticleListPage(BaseModel):
+    items: list[ArticleListItem]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
 class AnnotationOut(BaseModel):
     id: str
     entity_type: str
@@ -200,6 +208,90 @@ async def list_articles(
         )
         for a in articles
     ]
+
+
+@router.get("/articles/paged", response_model=ArticleListPage)
+async def list_articles_paged(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """List articles in pages for admin assignment and bulk selection."""
+    if has_role(user, "chuyen_gia"):
+        admin_users = await _get_users_with_role(db, "admin")
+        admin_ids = [u.id for u in admin_users]
+        if not admin_ids:
+            return ArticleListPage(items=[], page=page, page_size=page_size, total=0, total_pages=0)
+
+        assigned_result = await db.execute(
+            select(LabelAssignment.article_id)
+            .where(LabelAssignment.labeler_id == user.id)
+            .where(LabelAssignment.assigned_by.in_(admin_ids))
+        )
+        assigned_ids = {row[0] for row in assigned_result}
+        if not assigned_ids:
+            return ArticleListPage(items=[], page=page, page_size=page_size, total=0, total_pages=0)
+
+        total_result = await db.execute(
+            select(func.count(Article.id)).where(Article.id.in_(assigned_ids))
+        )
+        total = int(total_result.scalar_one() or 0)
+        articles_result = await db.execute(
+            select(Article)
+            .where(Article.id.in_(assigned_ids))
+            .order_by(Article.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        articles = articles_result.scalars().all()
+    else:
+        total_result = await db.execute(select(func.count(Article.id)))
+        total = int(total_result.scalar_one() or 0)
+        articles_result = await db.execute(
+            select(Article)
+            .order_by(Article.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        articles = articles_result.scalars().all()
+
+    assigned_result = await db.execute(
+        select(LabelAssignment.article_id)
+        .where(LabelAssignment.labeler_id == user.id)
+    )
+    assigned_ids = {row[0] for row in assigned_result}
+
+    counts_result = await db.execute(
+        select(LabelSubmission.article_id, func.count(LabelSubmission.id))
+        .group_by(LabelSubmission.article_id)
+    )
+    counts = {row[0]: row[1] for row in counts_result}
+
+    my_subs_result = await db.execute(
+        select(LabelSubmission.article_id, LabelSubmission.status)
+        .where(LabelSubmission.labeler_id == user.id)
+    )
+    my_subs = {row[0]: row[1] for row in my_subs_result}
+
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+    return ArticleListPage(
+        items=[
+            ArticleListItem(
+                article_id=a.id,
+                title=a.title,
+                url=a.url,
+                submission_count=counts.get(a.id, 0),
+                my_status=my_subs.get(a.id),
+                assigned_to_me=a.id in assigned_ids,
+            )
+            for a in articles
+        ],
+        page=page,
+        page_size=page_size,
+        total=total,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/articles/{article_id}", response_model=ArticleDetail)

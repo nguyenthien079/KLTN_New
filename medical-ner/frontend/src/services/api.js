@@ -155,6 +155,13 @@ export const getLabelingArticles = async () => {
   return response.data;
 };
 
+export const getLabelingArticlesPaged = async (page = 1, pageSize = 50) => {
+  const response = await api.get('/api/labeling/articles/paged', {
+    params: { page, page_size: pageSize },
+  });
+  return response.data;
+};
+
 export const getLabelingArticle = async (articleId) => {
   const response = await api.get(`/api/labeling/articles/${articleId}`);
   return response.data;

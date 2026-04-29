@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { assignArticlesBulk, getLabelingArticle, getLabelingArticles, getUsers } from '../services/api';
+import { assignArticlesBulk, getLabelingArticle, getLabelingArticlesPaged, getUsers } from '../services/api';
 import './DataListPage.css';
+
+const PAGE_SIZE = 50;
 
 function normalizeKey(value) {
   return (value || '')
@@ -47,6 +49,7 @@ export default function DataListPage() {
   const [items, setItems] = useState([]);
   const [experts, setExperts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedArticleIds, setSelectedArticleIds] = useState([]);
   const [selectedExpertIds, setSelectedExpertIds] = useState([]);
@@ -61,13 +64,33 @@ export default function DataListPage() {
   const [err, setErr] = useState(null);
   const folderInputRef = useRef(null);
 
+  const loadArticles = async ({ resetPage = false } = {}) => {
+    const firstPage = await getLabelingArticlesPaged(1, 200);
+    const totalPages = firstPage?.total_pages || 0;
+    const pageSize = firstPage?.page_size || 200;
+    const pageItems = [firstPage?.items || []];
+
+    if (totalPages > 1) {
+      const remainingPages = Array.from({ length: totalPages - 1 }, (_, index) => index + 2);
+      const remainingResults = await Promise.all(
+        remainingPages.map((pageNumber) => getLabelingArticlesPaged(pageNumber, pageSize))
+      );
+      remainingResults.forEach((result) => pageItems.push(result?.items || []));
+    }
+
+    const rows = pageItems.flat();
+    setServerItems(rows);
+    setItems(rows);
+    if (resetPage) setCurrentPage(1);
+    setSelectedId((current) => {
+      if (rows.some((item) => item.article_id === current)) return current;
+      return rows[0]?.article_id ?? null;
+    });
+  };
+
   useEffect(() => {
-    Promise.all([getLabelingArticles(), getUsers()])
-      .then(([articleData, userData]) => {
-        const rows = articleData || [];
-        setServerItems(rows);
-        setItems(rows);
-        if (articleData?.length) setSelectedId(articleData[0].article_id);
+    Promise.all([loadArticles({ resetPage: true }), getUsers()])
+      .then(([, userData]) => {
         setExperts(
           (userData || []).filter((u) => {
             const roles = Array.isArray(u.roles)
@@ -77,6 +100,7 @@ export default function DataListPage() {
           })
         );
       })
+      .catch(() => setErr('Không thể tải danh sách bài giao việc.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -111,8 +135,8 @@ export default function DataListPage() {
         importedRows.push({ ...matched, clean_text: txtContent, import_file_name: txtFile.name, import_annotations_count: annotations.length, import_folder_name: relativePath.split(/[\\\/]/)[0] || '' });
         if (annotations.length > 0) importedAnnotations[matched.article_id] = annotations;
       }
-      if (importedRows.length === 0) { setErr('Không khớp được file nào với dữ liệu hiện có trong hệ thống.'); setItems(serverItems); setImportedFolderName(''); setImportedAnnotationsByArticleId({}); return; }
-      setItems(importedRows); setImportedFolderName(importedRows[0].import_folder_name || '');
+      if (importedRows.length === 0) { setErr('Không khớp được file nào với dữ liệu hiện có trong hệ thống.'); setItems(serverItems); setCurrentPage(1); setImportedFolderName(''); setImportedAnnotationsByArticleId({}); return; }
+      setItems(importedRows); setCurrentPage(1); setImportedFolderName(importedRows[0].import_folder_name || '');
       setImportedAnnotationsByArticleId(importedAnnotations); setSelectedArticleIds([]); setSelectedId(importedRows[0].article_id);
       setMsg(unmatched.length > 0 ? `Đã nhập ${importedRows.length} file khớp. Bỏ qua ${unmatched.length} file không khớp.` : `Đã nhập ${importedRows.length} file.`);
     } catch (error) { setErr(error?.message || 'Không thể đọc folder đã chọn.'); }
@@ -128,6 +152,18 @@ export default function DataListPage() {
     const current = items.find((x) => x.article_id === selectedId);
     return current?.title || current?.url || '—';
   }, [items, selectedId]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const visibleItems = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return items.slice(start, start + PAGE_SIZE);
+  }, [currentPage, items]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const applyQuickSelect = () => {
     const from = Number.parseInt(quickFrom, 10), to = Number.parseInt(quickTo, 10);
@@ -152,11 +188,7 @@ export default function DataListPage() {
       const result = await assignArticlesBulk(selectedArticleIds, selectedExpertIds, false, initialAnnotations);
       setMsg(`Đã bàn giao thành công. Tạo mới: ${result.created}, bỏ qua (đã tồn tại): ${result.skipped}.`);
       setSelectedArticleIds([]); setSelectedExpertIds([]);
-      const latest = await getLabelingArticles(); setServerItems(latest || []);
-      if (importedAnnotationsByArticleId && Object.keys(importedAnnotationsByArticleId).length > 0) {
-        setItems((prev) => prev.filter((row) => (latest || []).some((item) => item.article_id === row.article_id)));
-      } else { setItems(latest || []); }
-      if ((latest || []).length && !selectedId) setSelectedId(latest[0].article_id);
+      await loadArticles();
     } catch (e) { setErr(e?.response?.data?.detail || 'Bàn giao thất bại. Vui lòng thử lại.'); }
     finally { setAssigning(false); }
   };
@@ -194,6 +226,25 @@ export default function DataListPage() {
               <button type="button" className="data-list-quick-select-btn" onClick={applyQuickSelect} disabled={loading || items.length === 0}>Chọn nhanh</button>
               {selectedArticleIds.length > 0 && <span className="data-list-selected-count">{selectedArticleIds.length} đã chọn</span>}
             </div>
+            <div className="data-list-pagination">
+              <button
+                type="button"
+                className="data-list-pagination-btn"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage <= 1}
+              >
+                ← Trang trước
+              </button>
+              <span className="data-list-pagination-info">Trang {currentPage} / {totalPages}</span>
+              <button
+                type="button"
+                className="data-list-pagination-btn"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                Trang sau →
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -209,7 +260,7 @@ export default function DataListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item, index) => (
+                  {visibleItems.map((item, index) => (
                     <tr
                       key={item.article_id}
                       className={[
@@ -218,7 +269,7 @@ export default function DataListPage() {
                       ].filter(Boolean).join(' ')}
                       onClick={() => setSelectedId(item.article_id)}
                     >
-                      <td className="data-list-stt-cell">{index + 1}</td>
+                      <td className="data-list-stt-cell">{(currentPage - 1) * PAGE_SIZE + index + 1}</td>
                       <td>
                         <div className="data-list-title-main">{item.title || item.url}</div>
                         {(item.import_annotations_count || importedAnnotationsByArticleId[item.article_id]?.length) > 0 && (
