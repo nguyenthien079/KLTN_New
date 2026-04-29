@@ -39,8 +39,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_discovered_urls_domain_id'), 'discovered_urls', ['domain_id'], unique=False)
     op.create_index(op.f('ix_discovered_urls_id'), 'discovered_urls', ['id'], unique=False)
-    op.drop_constraint('corrections_labeler_id_fkey', 'corrections', type_='foreignkey')
-    op.create_foreign_key(None, 'corrections', 'users', ['labeler_id'], ['id'])
+    # corrections table constraint handled in later migrations
     # ### end Alembic commands ###
 
 
