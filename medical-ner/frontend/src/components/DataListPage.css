@@ -363,3 +363,114 @@
     width: 100%;
   }
 }
+
+@media (max-width: 768px) {
+  .data-list-page {
+    margin-top: 18px;
+    gap: 10px;
+  }
+
+  .data-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .data-list-title {
+    font-size: 1rem;
+  }
+
+  .data-list-actions-bar,
+  .data-list-quick-select-form,
+  .data-list-pagination,
+  .data-list-assign-footer {
+    width: 100%;
+  }
+
+  .data-list-import-btn,
+  .data-list-quick-select-btn,
+  .data-list-pagination-btn,
+  .data-list-assign-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .data-list-quick-select-form,
+  .data-list-pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .data-list-quick-select-input {
+    width: 100%;
+  }
+
+  .data-list-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-list-table th,
+  .data-list-table td {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+  }
+
+  .data-list-stt-col {
+    width: 52px;
+  }
+
+  .data-list-checkbox-col {
+    width: 56px;
+  }
+
+  .data-list-preview-content {
+    max-height: none;
+  }
+
+  .data-list-assignee-list {
+    max-height: none;
+  }
+
+  .data-list-assign-btn {
+    margin: 0 12px 12px;
+  }
+  /* Ensure table cells and titles wrap on small screens to avoid clipped text */
+  .data-list-table td,
+  .data-list-title-main,
+  .data-list-stt-cell {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .data-list-quick-select-input { width: 72px; }
+
+  .data-list-preview-content { max-height: 36vh; }
+
+}
+
+@media (max-width: 480px) {
+  .data-list-table-wrap,
+  .data-list-preview-wrap,
+  .data-list-assignee-wrap {
+    border-radius: 12px;
+  }
+
+  .data-list-helper {
+    text-align: center;
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .data-list-assignee-item {
+    padding: 10px;
+  }
+
+  .data-list-title-main {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+}

@@ -106,3 +106,30 @@ a {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
 }
+
+/* ===== Mobile text and overflow helpers ===== */
+@media (max-width: 768px) {
+  html, body {
+    font-size: 15px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Allow wrapping on small screens to avoid clipped/truncated text */
+  .page * {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  /* Make media scale down inside narrow containers */
+  img, video, svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Reduce large fixed-height panels to allow scrolling */
+  .labeling-workspace, .data-list-layout {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+}

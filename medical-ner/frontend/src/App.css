@@ -883,12 +883,67 @@
 
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
+  .site-header {
+    padding: 16px 14px;
+  }
+
+  .header-inner,
+  .tab-nav-inner {
+    max-width: none;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .header-brand {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
   .header-title { font-size: 1.05rem; }
   .header-subtitle { font-size: 0.75rem; }
+
+  .tab-nav-inner {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .tab-nav .tab-btn {
+    height: 40px;
+    padding: 0 12px;
+    font-size: 0.8rem;
+  }
+
+  .tab-nav-user {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+    padding-top: 4px;
+    flex-wrap: wrap;
+  }
 
   .main-grid {
     grid-template-columns: 1fr;
     gap: 16px;
+  }
+
+  .results-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .annotation-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .btn-annotate,
+  .btn-save,
+  .btn-cancel {
+    width: 100%;
+    justify-content: center;
   }
 
   .legend-grid {
@@ -905,10 +960,22 @@
   }
 
   .results-panel { padding: 18px; }
+
+  .site-footer {
+    padding: 12px 14px;
+  }
 }
 
 @media (max-width: 480px) {
   .content-wrap { padding: 0 14px 36px; }
+
+  .input-panel,
+  .entity-legend,
+  .results-panel,
+  .system-stats {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
 
   .stats-row { grid-template-columns: 1fr; }
 
@@ -919,7 +986,14 @@
     justify-content: center;
   }
 
-  .tab-nav-inner { padding: 0 12px; }
+  .tab-nav-inner {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .tab-nav-user {
+    justify-content: space-between;
+  }
 }
 
 @media (max-width: 900px) {
