@@ -167,6 +167,11 @@ export const getLabelingArticle = async (articleId) => {
   return response.data;
 };
 
+export const importAdminArticles = async (files) => {
+  const response = await api.post('/api/admin/articles/import', { files });
+  return response.data;
+};
+
 export const getArticleSubmissions = async (articleId) => {
   const response = await api.get(`/api/labeling/articles/${articleId}/submissions`);
   return response.data;

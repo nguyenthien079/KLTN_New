@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { assignArticlesBulk, getLabelingArticle, getLabelingArticlesPaged, getUsers } from '../services/api';
+import { assignArticlesBulk, getLabelingArticle, getLabelingArticlesPaged, getUsers, importAdminArticles } from '../services/api';
 import './DataListPage.css';
 
 const PAGE_SIZE = 50;
@@ -120,7 +120,7 @@ export default function DataListPage() {
         const relativePath = pipeFile.webkitRelativePath || pipeFile.name;
         pipeByKey.set(normalizeKey(stemFromPath(relativePath)), parsePipeContent(await pipeFile.text()));
       }
-      const importedRows = [], importedAnnotations = {}, unmatched = [];
+      const importedRows = [], importedAnnotations = {}, unmatchedFiles = [];
       for (const txtFile of txtFiles) {
         const relativePath = txtFile.webkitRelativePath || txtFile.name;
         const key = normalizeKey(stemFromPath(relativePath));
@@ -131,14 +131,72 @@ export default function DataListPage() {
           const urlKey = normalizeKey(stemFromPath(item.url || ''));
           return titleKey === key || urlKey === key;
         });
-        if (!matched) { unmatched.push(txtFile.name); continue; }
+        if (!matched) {
+          unmatchedFiles.push({
+            file_name: txtFile.name,
+            relative_path: relativePath,
+            clean_text: txtContent,
+            folder_name: relativePath.split(/[\\\/]/)[0] || '',
+            annotations,
+          });
+          continue;
+        }
         importedRows.push({ ...matched, clean_text: txtContent, import_file_name: txtFile.name, import_annotations_count: annotations.length, import_folder_name: relativePath.split(/[\\\/]/)[0] || '' });
         if (annotations.length > 0) importedAnnotations[matched.article_id] = annotations;
       }
-      if (importedRows.length === 0) { setErr('Không khớp được file nào với dữ liệu hiện có trong hệ thống.'); setItems(serverItems); setCurrentPage(1); setImportedFolderName(''); setImportedAnnotationsByArticleId({}); return; }
-      setItems(importedRows); setCurrentPage(1); setImportedFolderName(importedRows[0].import_folder_name || '');
-      setImportedAnnotationsByArticleId(importedAnnotations); setSelectedArticleIds([]); setSelectedId(importedRows[0].article_id);
-      setMsg(unmatched.length > 0 ? `Đã nhập ${importedRows.length} file khớp. Bỏ qua ${unmatched.length} file không khớp.` : `Đã nhập ${importedRows.length} file.`);
+      let createdRows = [];
+      if (unmatchedFiles.length > 0) {
+        const createdResponse = await importAdminArticles(
+          unmatchedFiles.map((fileItem) => ({
+            file_name: fileItem.file_name,
+            relative_path: fileItem.relative_path,
+            clean_text: fileItem.clean_text,
+          }))
+        );
+        createdRows = (createdResponse?.items || []).map((item, index) => {
+          const sourceFile = unmatchedFiles[index];
+          const annotations = sourceFile?.annotations || [];
+          if (annotations.length > 0) importedAnnotations[item.article_id] = annotations;
+          return {
+            ...item,
+            import_file_name: sourceFile?.file_name || item.title || '',
+            import_annotations_count: annotations.length,
+            import_folder_name: sourceFile?.folder_name || '',
+          };
+        });
+      }
+      const finalRows = [...importedRows, ...createdRows];
+      if (finalRows.length === 0) {
+        setErr('Không thể nhập file nào.');
+        setItems(serverItems);
+        setCurrentPage(1);
+        setImportedFolderName('');
+        setImportedAnnotationsByArticleId({});
+        return;
+      }
+      setServerItems((prev) => {
+        const merged = [...prev];
+        finalRows.forEach((row) => {
+          if (!merged.some((item) => item.article_id === row.article_id)) {
+            merged.push(row);
+          }
+        });
+        return merged;
+      });
+      setItems(finalRows);
+      setCurrentPage(1);
+      setImportedFolderName(finalRows[0].import_folder_name || '');
+      setImportedAnnotationsByArticleId(importedAnnotations);
+      setSelectedArticleIds([]);
+      setSelectedId(finalRows[0].article_id);
+      const importedCount = importedRows.length + createdRows.length;
+      const createdCount = createdRows.length;
+      const matchedCount = importedRows.length;
+      setMsg(
+        createdCount > 0
+          ? `Đã nhập ${importedCount} file (${matchedCount} khớp sẵn, ${createdCount} đã tạo mới).`
+          : `Đã nhập ${importedCount} file khớp sẵn.`
+      );
     } catch (error) { setErr(error?.message || 'Không thể đọc folder đã chọn.'); }
     finally { setImporting(false); }
   };
@@ -267,7 +325,10 @@ export default function DataListPage() {
                         selectedId === item.article_id ? 'data-list-row--active' : '',
                         selectedArticleIds.includes(item.article_id) ? 'data-list-row--checked' : '',
                       ].filter(Boolean).join(' ')}
-                      onClick={() => setSelectedId(item.article_id)}
+                      onClick={() => {
+                        toggleArticle(item.article_id);
+                        setSelectedId(item.article_id);
+                      }}
                     >
                       <td className="data-list-stt-cell">{(currentPage - 1) * PAGE_SIZE + index + 1}</td>
                       <td>
