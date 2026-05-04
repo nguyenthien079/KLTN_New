@@ -931,6 +931,7 @@ async def _upsert_entities(db: AsyncSession, article_id: int, annotations: list[
                 frequency=1,
                 avg_confidence=1.0,
             ))
+            await db.flush()
 
 
 @router.patch("/review/{submission_id}/reject")
