@@ -27,6 +27,35 @@
   padding-bottom: 8px;
 }
 
+.adm-close-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+  font-family: inherit;
+}
+
+.adm-close-btn:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.adm-close-btn:active {
+  transform: scale(0.95);
+}
+
 .adm-title {
   font-size: 1.5rem;
   font-weight: 800;
@@ -465,21 +494,91 @@
 
 @media (max-width: 640px) {
   .adm-root {
-    padding: 20px 14px 32px;
-    gap: 20px;
+    padding: 16px 12px 24px;
+    gap: 16px;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .adm-header {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .adm-header > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .adm-title {
+    font-size: 1.1rem;
+    margin-bottom: 2px;
+  }
+
+  .adm-subtitle {
+    font-size: 0.75rem;
   }
 
   .adm-live-pill {
     margin-top: 0;
+    padding: 5px 10px;
+    font-size: 0.7rem;
+    flex-shrink: 0;
   }
 
-  .adm-section { padding: 18px 16px; }
-  .adm-pie-wrapper { flex-direction: column; align-items: center; }
+  .adm-close-btn {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+
+  .adm-cards-grid {
+    gap: 12px;
+  }
+
+  .adm-stat-card {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .adm-stat-icon-wrap {
+    width: 40px;
+    height: 40px;
+  }
+
+  .adm-stat-value {
+    font-size: 1.3rem;
+  }
+
+  .adm-stat-label {
+    font-size: 0.75rem;
+  }
+
+  .adm-section {
+    padding: 14px 12px;
+  }
+
+  .adm-section-hd {
+    margin-bottom: 16px;
+  }
+
+  .adm-section-title {
+    font-size: 0.8rem;
+  }
+
+  .adm-count-badge {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+  }
+
+  .adm-pie-wrapper {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
 
   .adm-pie-legend {
     min-width: 0;
@@ -488,7 +587,26 @@
   }
 
   .adm-article-list {
-    max-height: 320px;
+    max-height: 280px;
+  }
+
+  .adm-article-item {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .adm-article-idx {
+    font-size: 0.72rem;
+    min-width: 20px;
+  }
+
+  .adm-article-text {
+    font-size: 0.8rem;
+  }
+
+  .adm-article-id {
+    font-size: 0.65rem;
+    padding: 2px 6px;
   }
 }
 

@@ -29,6 +29,7 @@ function App() {
   const [readNotificationKeys, setReadNotificationKeys] = useState([]);
   const [isBellOpen, setIsBellOpen] = useState(false);
   const [labelingFocusRequest, setLabelingFocusRequest] = useState(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const bellRef = useRef(null);
   const roles = useMemo(
     () => (Array.isArray(user?.roles)
@@ -210,15 +211,32 @@ function App() {
 
       <nav className="tab-nav">
         <div className="tab-nav-inner">
-          {roleTabConfig.map((t) => (
+          {roleTabConfig.length > 1 && (
             <button
-              key={t.id}
-              className={`tab-btn${tab === t.id ? ' tab-btn--active' : ''}`}
-              onClick={() => handleTabChange(t.id)}
+              className={`tab-nav-hamburger${isMenuOpen ? ' tab-nav-hamburger--active' : ''}`}
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              title="Menu"
+              aria-label="Mở menu"
             >
-              {t.label}
+              <span></span>
+              <span></span>
+              <span></span>
             </button>
-          ))}
+          )}
+          <div className={`tab-nav-menu${isMenuOpen ? ' tab-nav-menu--open' : ''}`}>
+            {roleTabConfig.map((t) => (
+              <button
+                key={t.id}
+                className={`tab-btn${tab === t.id ? ' tab-btn--active' : ''}`}
+                onClick={() => {
+                  handleTabChange(t.id);
+                  setIsMenuOpen(false);
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
           <div className="tab-nav-user">
             <span className="tab-nav-username">
               {user.display_name || user.username}
