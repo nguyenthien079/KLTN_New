@@ -22,7 +22,7 @@ class Entity(Base):
     # Entity info
     text = Column(String(512), nullable=False, index=True)
     normalized_text = Column(String(512), index=True)
-    entity_type = Column(SQLEnum(EntityType), nullable=False, index=True)
+    entity_type = Column(SQLEnum(EntityType, native_enum=False), nullable=False, index=True)
 
     # Statistics
     frequency = Column(Integer, default=1)
