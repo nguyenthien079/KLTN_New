@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getArticleSubmissions, getLabelingArticle, getLabelingArticles, saveSubmission } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { ENTITY_COLORS } from '../config/entityColors';
+import { getExpandedSelection } from '../utils/textSelection';
 import './LabelingPage.css';
 
 const ENTITY_TYPES = Object.keys(ENTITY_COLORS);
@@ -106,20 +107,18 @@ function ArticleAnnotatorCard({ article, annotations, onSelectText, onRemoveAnno
     if (!textRef.current?.contains(sel.anchorNode) || !textRef.current?.contains(sel.focusNode)) return;
 
     const range = sel.getRangeAt(0);
-    const rawText = range.toString();
-    const trimmed = rawText.trim();
-    if (!trimmed) return;
+    const fullText = article.clean_text || '';
+    
+    // Use helper to get expanded selection with word boundaries
+    const selectionData = getExpandedSelection(textRef.current, range, fullText);
+    if (!selectionData) return;
 
-    const beforeRange = document.createRange();
-    beforeRange.setStart(textRef.current, 0);
-    beforeRange.setEnd(range.startContainer, range.startOffset);
-
-    const start = beforeRange.toString().length;
-    const end = start + rawText.length;
+    const { start, end, expandedText } = selectionData;
+    
     const rect = range.getBoundingClientRect();
-    onSelectText(article.article_id, { x: rect.left, y: rect.bottom + 8, start, end, text: trimmed });
+    onSelectText(article.article_id, { x: rect.left, y: rect.bottom + 8, start, end, text: expandedText });
     sel.removeAllRanges();
-  }, [article.article_id, onSelectText]);
+  }, [article.article_id, article.clean_text, onSelectText]);
 
   return (
     <div className="labeling-article-card">

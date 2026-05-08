@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getLabelingArticle, getArticleSubmissions, saveSubmission, exportArticleAnnotations } from '../services/api';
 import { ENTITY_COLORS } from '../config/entityColors';
+import { getExpandedSelection } from '../utils/textSelection';
 import './AnnotationView.css';
 
 const ENTITY_TYPES = Object.keys(ENTITY_COLORS);
@@ -132,7 +133,7 @@ export default function AnnotationView({ articleId, onBack }) {
     });
   }, [articleId, user.user_id]);
 
-  // U3 fix: check both anchorNode and focusNode; trim-aware offsets
+  // U3 fix: check both anchorNode and focusNode; expand to word boundaries
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
@@ -142,23 +143,18 @@ export default function AnnotationView({ articleId, onBack }) {
     ) return;
 
     const range = sel.getRangeAt(0);
-    const rawText = range.toString();
-    const text = rawText.trim();
-    if (!text) return;
+    if (!article?.clean_text) return;
 
-    const beforeRange = document.createRange();
-    beforeRange.setStart(textRef.current, 0);
-    beforeRange.setEnd(range.startContainer, range.startOffset);
+    // Use helper to get expanded selection with word boundaries
+    const selectionData = getExpandedSelection(textRef.current, range, article.clean_text);
+    if (!selectionData) return;
 
-    const rawStart = beforeRange.toString().length;
-    const leadingSpaces = rawText.length - rawText.trimStart().length;
-    const start = rawStart + leadingSpaces;
-    const end = start + text.length;
-
+    const { start, end, expandedText } = selectionData;
+    
     const rect = range.getBoundingClientRect();
-    setPopup({ mode: 'add', x: rect.left, y: rect.bottom + 8, start, end, text });
+    setPopup({ mode: 'add', x: rect.left, y: rect.bottom + 8, start, end, text: expandedText });
     sel.removeAllRanges();
-  }, []);
+  }, [article?.clean_text]);
 
   const handleEditClick = (idx) => {
     const ann = myAnnotations[idx];

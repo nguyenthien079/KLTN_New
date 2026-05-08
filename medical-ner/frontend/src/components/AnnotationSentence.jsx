@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import EntityPopup from './EntityPopup';
 import { ENTITY_CONFIG } from '../config/entityConfig';
+import { expandToWordBoundaries } from '../utils/textSelection';
 import './AnnotationSentence.css';
 
 const AnnotationSentence = ({ sentence, entities, onEntitiesChange }) => {
@@ -26,13 +27,17 @@ const AnnotationSentence = ({ sentence, entities, onEntitiesChange }) => {
     const text = sel?.toString().trim();
     if (!text || text.length === 0) return;
 
-    // Find position in sentence
-    const start = sentence.indexOf(text);
-    if (start === -1) {
+    // Find position in sentence (first occurrence of trimmed text)
+    const trimmedStart = sentence.indexOf(text);
+    if (trimmedStart === -1) {
       sel.removeAllRanges();
       return;
     }
-    const end = start + text.length;
+    const trimmedEnd = trimmedStart + text.length;
+
+    // Expand to word boundaries
+    const { newStart: start, newEnd: end } = expandToWordBoundaries(sentence, trimmedStart, trimmedEnd);
+    const expandedText = sentence.slice(start, end);
 
     // Check for overlap with existing entities
     const hasOverlap = localEntities.some(
@@ -50,7 +55,7 @@ const AnnotationSentence = ({ sentence, entities, onEntitiesChange }) => {
       mode: 'add',
       start,
       end,
-      text,
+      text: expandedText,
       x: rect.left,
       y: rect.bottom + 6
     });
