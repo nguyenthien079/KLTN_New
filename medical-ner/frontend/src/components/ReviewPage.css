@@ -356,6 +356,14 @@
   margin-bottom: 3px;
 }
 
+.review-entities-hint {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-style: italic;
+  margin-bottom: 5px;
+  display: block;
+}
+
 .review-entity-chip {
   display: inline-flex;
   align-items: center;
@@ -364,6 +372,7 @@
   border-radius: 6px;
   font-size: 0.8rem;
   width: fit-content;
+  transition: all 0.2s ease;
 }
 
 .review-entity-chip em {
@@ -375,6 +384,19 @@
 
 .review-entity-chip--original  { background: #f8fafc; color: #1f2937; border: 1px solid #e2e8f0; }
 .review-entity-chip--corrected { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+.review-entity-chip--removed {
+  cursor: pointer;
+}
+
+.review-entity-chip--removed:hover {
+  opacity: 0.7 !important;
+}
+
+.review-entity-chip--disabled {
+  cursor: default !important;
+  pointer-events: none;
+}
 
 .review-actions {
   display: flex;

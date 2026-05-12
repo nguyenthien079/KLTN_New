@@ -134,6 +134,15 @@ class ReviewRejectRequest(BaseModel):
     reason: Optional[str] = None
 
 
+class ConfirmRequest(BaseModel):
+    """Request to confirm label submission with optional annotation filtering.
+    
+    kept_annotation_ids: List of annotation IDs to keep. If provided,
+                        all other annotations will be deleted before confirming.
+    """
+    kept_annotation_ids: Optional[list[str]] = None
+
+
 class NotificationItem(BaseModel):
     article_id: int
     article_title: Optional[str]
@@ -840,6 +849,7 @@ async def get_label_review_queue(
 @router.patch("/review/{submission_id}/confirm")
 async def confirm_label_submission(
     submission_id: str,
+    request: ConfirmRequest,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -853,6 +863,19 @@ async def confirm_label_submission(
     sub = result.scalar_one_or_none()
     if not sub:
         raise HTTPException(status_code=404, detail="Không tìm thấy submission")
+    
+    # Delete annotations not in the kept list (if any kept_annotation_ids provided)
+    if request.kept_annotation_ids is not None:
+        annotations_to_keep = set(request.kept_annotation_ids)
+        annotations_to_delete = [
+            ann for ann in (sub.annotations or [])
+            if ann.id not in annotations_to_keep
+        ]
+        for ann in annotations_to_delete:
+            await db.delete(ann)
+        # Refresh annotations list
+        sub.annotations = [ann for ann in (sub.annotations or []) if ann.id in annotations_to_keep]
+    
     sub.status = "confirmed"
     sub.reject_reason = None
 

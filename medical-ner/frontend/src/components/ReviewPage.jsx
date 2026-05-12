@@ -130,6 +130,7 @@ export default function ReviewPage({ readOnly = false }) {
   const [selectedArticleId, setSelectedArticleId] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [removedEntities, setRemovedEntities] = useState({});
 
   const load = async () => {
     setLoading(true);
@@ -151,8 +152,28 @@ export default function ReviewPage({ readOnly = false }) {
   const handleConfirm = async (id) => {
     setActionError(null);
     try {
-      await confirmCorrection(id);
+      // Get the kept annotation IDs (annotations not removed)
+      const removedIndices = removedEntities[id] || new Set();
+      const submission = items.find(item => item.id === id);
+      
+      let keptAnnotationIds = null;
+      if (submission && removedIndices.size > 0) {
+        // Only pass kept IDs if some were removed
+        keptAnnotationIds = (submission.corrected_entities || [])
+          .map((_, i) => i)
+          .filter(i => !removedIndices.has(i))
+          .map((i) => submission.corrected_entities[i].id || String(i));
+      }
+      
+      await confirmCorrection(id, keptAnnotationIds);
       setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: 'confirmed', reject_reason: null } : x)));
+      
+      // Clear removed entities for this submission
+      setRemovedEntities((prev) => {
+        const newState = { ...prev };
+        delete newState[id];
+        return newState;
+      });
     } catch (err) {
       setActionError(err.response?.data?.detail || 'Không thể duyệt.');
     }
@@ -353,15 +374,55 @@ export default function ReviewPage({ readOnly = false }) {
                         </div>
 
                         <div className="review-entities-col">
-                          <span className="review-entities-label">Tag đã gán ({(sub.corrected_entities || []).length})</span>
+                          {(() => {
+                            const total = (sub.corrected_entities || []).length;
+                            const removed = removedEntities[sub.id]?.size || 0;
+                            const kept = total - removed;
+                            return (
+                              <span className="review-entities-label">
+                                Tag đã gán ({kept}{removed > 0 ? `/${total}` : ''})
+                                {removed > 0 && <em style={{ marginLeft: '8px', color: '#ef4444' }}>xoá {removed}</em>}
+                              </span>
+                            );
+                          })()}
+                          {sub.status === 'pending_review' && (
+                            <span className="review-entities-hint">Nhấp vào tag để xoá/khôi phục</span>
+                          )}
                           <div className="review-entity-chip-wrap">
                             {(sub.corrected_entities || []).map((e, i) => {
                               const n = normalizeEntity(e);
+                              const isRemoved = removedEntities[sub.id]?.has(i) || false;
+                              const isEditable = sub.status === 'pending_review';
+                              const handleToggleRemove = () => {
+                                if (!isEditable) return;
+                                setRemovedEntities((prev) => {
+                                  const newSet = new Set(prev[sub.id] || []);
+                                  if (isRemoved) {
+                                    newSet.delete(i);
+                                  } else {
+                                    newSet.add(i);
+                                  }
+                                  if (newSet.size === 0) {
+                                    const newState = { ...prev };
+                                    delete newState[sub.id];
+                                    return newState;
+                                  }
+                                  return { ...prev, [sub.id]: newSet };
+                                });
+                              };
                               return (
                                 <span
                                   key={`${sub.id}-${i}`}
-                                  className="review-entity-chip"
-                                  style={{ background: labelerColor.bg, border: `1px solid ${labelerColor.border}` }}
+                                  className={`review-entity-chip${isRemoved ? ' review-entity-chip--removed' : ''}${!isEditable ? ' review-entity-chip--disabled' : ''}`}
+                                  style={{
+                                    background: labelerColor.bg,
+                                    border: `1px solid ${labelerColor.border}`,
+                                    opacity: isRemoved ? 0.5 : 1,
+                                    textDecoration: isRemoved ? 'line-through' : 'none',
+                                    cursor: isEditable ? 'pointer' : 'default',
+                                  }}
+                                  onClick={handleToggleRemove}
+                                  title={isEditable ? (isRemoved ? 'Nhấp để khôi phục tag' : 'Nhấp để xoá tag') : 'Không thể chỉnh sửa submission đã duyệt'}
                                 >
                                   {n.text} <em>{n.type}</em>
                                 </span>

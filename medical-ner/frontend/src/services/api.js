@@ -114,8 +114,12 @@ export const getReviewQueue = async () => {
   return response.data;
 };
 
-export const confirmCorrection = async (id) => {
-  const response = await api.patch(`/api/labeling/review/${id}/confirm`);
+export const confirmCorrection = async (id, keptAnnotationIds = null) => {
+  const payload = {};
+  if (keptAnnotationIds !== null) {
+    payload.kept_annotation_ids = keptAnnotationIds;
+  }
+  const response = await api.patch(`/api/labeling/review/${id}/confirm`, payload);
   return response.data;
 };
 

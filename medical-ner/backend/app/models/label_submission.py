@@ -18,5 +18,7 @@ class LabelSubmission(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    article = relationship("Article")
+    labeler = relationship("User")
     annotations = relationship("LabelAnnotation", back_populates="submission",
                                 cascade="all, delete-orphan")
